@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cyber Snake</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap" rel="stylesheet">
+    <style>
+        /* Mobile Controls */
+        #mobile-controls {
+            display: none;
+            margin-top: 20px;
+            grid-template-columns: repeat(3, 60px);
+            grid-template-rows: repeat(2, 60px);
+            gap: 10px;
+        }
+        .d-btn {
+            background: rgba(255,255,255,0.1); border: 1px solid var(--primary-neon);
+            border-radius: 50%; color: #fff; font-size: 1.5rem;
+            display: flex; justify-content: center; align-items: center;
+            cursor: pointer; -webkit-user-select: none;
+        }
+        .d-btn:active { background: var(--primary-neon); color: #000; }
+        .up { grid-column: 2; grid-row: 1; }
+        .left { grid-column: 1; grid-row: 2; }
+        .down { grid-column: 2; grid-row: 2; }
+        .right { grid-column: 3; grid-row: 2; }
+
+        @media (hover: none) and (pointer: coarse) {
+            #mobile-controls { display: grid; }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-wrapper">
+        <div class="header-bar">
+            <a href="index.html" class="neon-btn">🔙 Menu</a>
+            <div id="score" style="font-family: 'Orbitron'; font-size: 1.5rem;">Score: 0</div>
+            <button class="neon-btn secondary" onclick="resetGame()">Reset</button>
+        </div>
+        
+        <canvas id="gameCanvas"></canvas>
+
+        <div id="mobile-controls">
+            <div class="d-btn up" onclick="handleInput('ArrowUp')">⬆</div>
+            <div class="d-btn left" onclick="handleInput('ArrowLeft')">⬅</div>
+            <div class="d-btn down" onclick="handleInput('ArrowDown')">⬇</div>
+            <div class="d-btn right" onclick="handleInput('ArrowRight')">➡</div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Config
+        let tileCount = 20;
+        let gridSize = 20;
+        let speed = 100;
+        
+        // Game State
+        let snake = [];
+        let food = {};
+        let dx = 0; 
+        let dy = 0;
+        let score = 0;
+        let gameInterval;
+        let isGameRunning = false;
+
+        function init() {
+            // Resize canvas responsive
+            let size = Math.min(window.innerWidth - 40, 400);
+            // Đảm bảo size chia hết cho tileCount
+            size = Math.floor(size / tileCount) * tileCount; 
+            canvas.width = size;
+            canvas.height = size;
+            gridSize = size / tileCount;
+            
+            resetGame();
+        }
+
+        function resetGame() {
+            snake = [{x: 10, y: 10}];
+            placeFood();
+            dx = 0; dy = 0;
+            score = 0;
+            updateScore();
+            if (gameInterval) clearInterval(gameInterval);
+            isGameRunning = true;
+            gameInterval = setInterval(gameLoop, speed);
+        }
+
+        function gameLoop() {
+            if(!isGameRunning) return;
+
+            // Di chuyển
+            const head = { x: snake[0].x + dx, y: snake[0].y + dy };
+
+            // Nếu chưa di chuyển thì không check va chạm
+            if(dx === 0 && dy === 0) {
+                draw();
+                return;
+            }
+
+            // Va chạm tường
+            if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
+                gameOver();
+                return;
+            }
+
+            // Va chạm thân
+            for (let part of snake) {
+                if (head.x === part.x && head.y === part.y) {
+                    gameOver();
+                    return;
+                }
+            }
+
+            snake.unshift(head);
+
+            // Ăn mồi
+            if (head.x === food.x && head.y === food.y) {
+                score += 10;
+                updateScore();
+                placeFood();
+                // Tăng tốc nhẹ
+                if(speed > 50) {
+                    clearInterval(gameInterval);
+                    speed -= 2;
+                    gameInterval = setInterval(gameLoop, speed);
+                }
+            } else {
+                snake.pop();
+            }
+
+            draw();
+        }
+
+        function draw() {
+            // Xóa màn hình
+            ctx.fillStyle = "#050505";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Vẽ Rắn
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = "#0ff";
+            ctx.fillStyle = "#0ff";
+            snake.forEach((part, index) => {
+                if(index === 0) ctx.fillStyle = "#fff"; // Đầu rắn màu trắng
+                else ctx.fillStyle = "#0ff";
+                ctx.fillRect(part.x * gridSize + 1, part.y * gridSize + 1, gridSize - 2, gridSize - 2);
+            });
+
+            // Vẽ Mồi
+            ctx.shadowColor = "#f0f";
+            ctx.fillStyle = "#f0f";
+            ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize - 2, gridSize - 2);
+            
+            ctx.shadowBlur = 0;
+        }
+
+        function placeFood() {
+            food = {
+                x: Math.floor(Math.random() * tileCount),
+                y: Math.floor(Math.random() * tileCount)
+            };
+            // Không trùng rắn
+            for(let part of snake) {
+                if(part.x === food.x && part.y === food.y) placeFood();
+            }
+        }
+
+        function gameOver() {
+            isGameRunning = false;
+            clearInterval(gameInterval);
+            alert(`Game Over! Score: ${score}`);
+            resetGame();
+        }
+
+        function updateScore() {
+            document.getElementById('score').innerText = `Score: ${score}`;
+        }
+
+        // Input
+        document.addEventListener('keydown', (e) => handleInput(e.key));
+
+        function handleInput(key) {
+            if(!isGameRunning) return;
+            switch(key) {
+                case 'ArrowUp': if(dy !== 1) { dx = 0; dy = -1; } break;
+                case 'ArrowDown': if(dy !== -1) { dx = 0; dy = 1; } break;
+                case 'ArrowLeft': if(dx !== 1) { dx = -1; dy = 0; } break;
+                case 'ArrowRight': if(dx !== -1) { dx = 1; dy = 0; } break;
+            }
+        }
+
+        window.onload = init;
+        window.onresize = init;
+    </script>
+</body>
+</html>
+
