@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Pong</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="game-wrapper">
+        <div class="header-bar">
+            <a href="index.html" class="neon-btn">🔙 Menu</a>
+            <div id="score" style="font-family: 'Orbitron'; font-size: 1.5rem;">0 : 0</div>
+            <button class="neon-btn secondary" onclick="resetGame()">Reset</button>
+        </div>
+        <canvas id="pongCanvas"></canvas>
+        <div style="margin-top: 10px; font-size: 0.8rem; color: #888;">
+            P1 (Trái): W/S hoặc Touch | P2/AI (Phải): ⬆/⬇
+        </div>
+    </div>
+
+    <!-- Chọn chế độ -->
+    <div id="mode-modal" class="modal active">
+        <div class="modal-content">
+            <h2>CHỌN CHẾ ĐỘ</h2>
+            <button class="neon-btn" onclick="startGame(true)">Đấu với AI</button>
+            <button class="neon-btn secondary" onclick="startGame(false)">2 Người Chơi</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('pongCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Cấu hình
+        canvas.width = 800;
+        canvas.height = 500;
+        const paddleWidth = 10, paddleHeight = 100;
+        let isAI = true;
+        let gameLoop;
+
+        // Đối tượng game
+        const user = { x: 0, y: canvas.height/2 - 50, score: 0 };
+        const com = { x: canvas.width - 10, y: canvas.height/2 - 50, score: 0 };
+        const ball = { x: canvas.width/2, y: canvas.height/2, radius: 10, speed: 7, velocityX: 5, velocityY: 5 };
+        const net = { x: (canvas.width - 2)/2, y: 0, width: 2, height: 10 };
+
+        // Điều khiển
+        canvas.addEventListener('mousemove', movePaddle);
+        window.addEventListener('keydown', handleKey);
+
+        function movePaddle(evt) {
+            let rect = canvas.getBoundingClientRect();
+            user.y = evt.clientY - rect.top - paddleHeight/2;
+        }
+
+        function handleKey(e) {
+            // P1 Controls (W/S)
+            if(e.key === 'w' || e.key === 'W') user.y -= 20;
+            if(e.key === 's' || e.key === 'S') user.y += 20;
+
+            // P2 Controls (Up/Down) - Nếu không phải AI
+            if(!isAI) {
+                if(e.key === 'ArrowUp') com.y -= 20;
+                if(e.key === 'ArrowDown') com.y += 20;
+            }
+        }
+
+        function drawRect(x, y, w, h, color) { ctx.fillStyle = color; ctx.fillRect(x, y, w, h); }
+        function drawArc(x, y, r, color) { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); ctx.closePath(); }
+        function drawText(text, x, y) { ctx.fillStyle = "#FFF"; ctx.font = "40px Orbitron"; ctx.fillText(text, x, y); }
+        function drawNet() {
+            for(let i=0; i<=canvas.height; i+=15) drawRect(net.x, net.y + i, net.width, net.height, "#333");
+        }
+
+        function update() {
+            // Di chuyển bóng
+            ball.x += ball.velocityX;
+            ball.y += ball.velocityY;
+
+            // Va chạm trên dưới
+            if(ball.y + ball.radius > canvas.height || ball.y - ball.radius < 0) ball.velocityY = -ball.velocityY;
+
+            // AI Logic (Simple tracking)
+            if(isAI) {
+                let computerLevel = 0.1; // Độ trễ của AI
+                com.y += (ball.y - (com.y + paddleHeight/2)) * computerLevel;
+            }
+
+            // Xác định người chơi nào đang đánh (dựa vào vị trí bóng)
+            let player = (ball.x < canvas.width/2) ? user : com;
+
+            // Va chạm vợt
+            if(collision(ball, player)) {
+                let collidePoint = (ball.y - (player.y + paddleHeight/2));
+                collidePoint = collidePoint / (paddleHeight/2);
+                let angleRad = (Math.PI/4) * collidePoint;
+                let direction = (ball.x + ball.radius < canvas.width/2) ? 1 : -1;
+                
+                ball.velocityX = direction * ball.speed * Math.cos(angleRad);
+                ball.velocityY = ball.speed * Math.sin(angleRad);
+                ball.speed += 0.5; // Tăng tốc độ
+            }
+
+            // Ghi điểm
+            if(ball.x - ball.radius < 0) { com.score++; resetBall(); }
+            else if(ball.x + ball.radius > canvas.width) { user.score++; resetBall(); }
+            
+            document.getElementById('score').innerText = `${user.score} : ${com.score}`;
+        }
+
+        function collision(b, p) {
+            p.top = p.y; p.bottom = p.y + paddleHeight;
+            p.left = p.x; p.right = p.x + paddleWidth;
+            b.top = b.y - b.radius; b.bottom = b.y + b.radius;
+            b.left = b.x - b.radius; b.right = b.x + b.radius;
+            return p.left < b.right && p.top < b.bottom && p.right > b.left && p.bottom > b.top;
+        }
+
+        function resetBall() {
+            ball.x = canvas.width/2; ball.y = canvas.height/2;
+            ball.velocityX = -ball.velocityX;
+            ball.speed = 7;
+        }
+
+        function render() {
+            drawRect(0, 0, canvas.width, canvas.height, "#050505"); // Clear
+            drawNet();
+            drawRect(user.x, user.y, paddleWidth, paddleHeight, "#0ff"); // P1 Cyan
+            drawRect(com.x, com.y, paddleWidth, paddleHeight, "#f0f"); // P2 Magenta
+            drawArc(ball.x, ball.y, ball.radius, "#ff0"); // Ball Yellow
+        }
+
+        function game() { update(); render(); requestAnimationFrame(game); }
+
+        function startGame(aiMode) {
+            isAI = aiMode;
+            document.getElementById('mode-modal').classList.remove('active');
+            game();
+        }
+
+        function resetGame() {
+            user.score = 0; com.score = 0;
+            resetBall();
+            document.getElementById('mode-modal').classList.add('active');
+        }
+    </script>
+</body>
+</html>
+
