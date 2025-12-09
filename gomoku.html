@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>Gomoku (Caro)</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap" rel="stylesheet">
+    <style>
+        .gomoku-board {
+            display: grid;
+            grid-template-columns: repeat(15, 1fr);
+            gap: 1px;
+            background-color: #333;
+            border: 2px solid var(--accent-neon);
+            padding: 2px;
+            width: 95vw;
+            height: 95vw;
+            max-width: 500px;
+            max-height: 500px;
+            box-shadow: 0 0 15px var(--accent-neon);
+        }
+        .cell {
+            background-color: #000;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 0.8rem; font-family: sans-serif; cursor: pointer;
+        }
+        .cell.x::after { content: 'X'; color: var(--primary-neon); font-weight: bold; }
+        .cell.o::after { content: 'O'; color: var(--secondary-neon); font-weight: bold; }
+        
+        /* Highlight nước đi cuối cùng */
+        .cell.last-move { background-color: rgba(255,255,255,0.2); }
+    </style>
+</head>
+<body>
+    <div class="game-wrapper">
+        <div class="header-bar">
+            <a href="index.html" class="neon-btn">🔙 Menu</a>
+            <div id="status">Turn: X</div>
+            <button class="neon-btn secondary" onclick="showModeSelection()">Reset</button>
+        </div>
+        
+        <div class="gomoku-board" id="board"></div>
+    </div>
+
+    <!-- Modal -->
+    <div id="mode-modal" class="modal active">
+        <div class="modal-content">
+            <h2>GOMOKU</h2>
+            <p>Luật: 5 quân liên tiếp để thắng</p>
+            <button class="neon-btn" onclick="startGame(true)">Đấu với AI</button>
+            <button class="neon-btn secondary" onclick="startGame(false)">2 Người Chơi</button>
+        </div>
+    </div>
+
+    <script>
+        const SIZE = 15;
+        const boardEl = document.getElementById('board');
+        let board = [];
+        let isAI = false;
+        let currentPlayer = 'X';
+        let gameActive = false;
+
+        function showModeSelection() {
+            document.getElementById('mode-modal').classList.add('active');
+        }
+
+        function startGame(aiMode) {
+            isAI = aiMode;
+            board = Array(SIZE).fill().map(() => Array(SIZE).fill(null));
+            currentPlayer = 'X';
+            gameActive = true;
+            document.getElementById('status').innerText = "Turn: X";
+            renderBoard();
+            document.getElementById('mode-modal').classList.remove('active');
+        }
+
+        function renderBoard() {
+            boardEl.innerHTML = '';
+            for(let r=0; r<SIZE; r++) {
+                for(let c=0; c<SIZE; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.r = r;
+                    cell.dataset.c = c;
+                    cell.onclick = () => handleMove(r, c);
+                    boardEl.appendChild(cell);
+                }
+            }
+        }
+
+        function handleMove(r, c) {
+            if(!gameActive || board[r][c]) return;
+
+            makeMove(r, c, currentPlayer);
+
+            if(checkWin(r, c, currentPlayer)) {
+                alert(`${currentPlayer} WIN!`);
+                gameActive = false;
+                return;
+            }
+
+            currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+            document.getElementById('status').innerText = `Turn: ${currentPlayer}`;
+
+            if(isAI && currentPlayer === 'O' && gameActive) {
+                document.body.style.cursor = 'wait';
+                setTimeout(() => {
+                    aiMove();
+                    document.body.style.cursor = 'default';
+                }, 100);
+            }
+        }
+
+        function makeMove(r, c, player) {
+            board[r][c] = player;
+            const index = r * SIZE + c;
+            const cell = boardEl.children[index];
+            cell.classList.add(player.toLowerCase());
+            
+            // Xóa highlight cũ
+            document.querySelectorAll('.last-move').forEach(el => el.classList.remove('last-move'));
+            cell.classList.add('last-move');
+        }
+
+        function checkWin(r, c, player) {
+            const dirs = [[1,0], [0,1], [1,1], [1,-1]];
+            for(let [dr, dc] of dirs) {
+                let count = 1;
+                for(let i=1; i<5; i++) {
+                    let nr = r + dr*i, nc = c + dc*i;
+                    if(nr>=0 && nr<SIZE && nc>=0 && nc<SIZE && board[nr][nc]===player) count++;
+                    else break;
+                }
+                for(let i=1; i<5; i++) {
+                    let nr = r - dr*i, nc = c - dc*i;
+                    if(nr>=0 && nr<SIZE && nc>=0 && nc<SIZE && board[nr][nc]===player) count++;
+                    else break;
+                }
+                if(count >= 5) return true;
+            }
+            return false;
+        }
+
+        // --- HEURISTIC AI (Chiến thuật chấm điểm) ---
+        function aiMove() {
+            let bestScore = -Infinity;
+            let moves = [];
+            
+            // Chỉ xét các ô trống lân cận các quân đã đánh (để tối ưu hiệu năng)
+            let candidates = new Set();
+            for(let r=0; r<SIZE; r++) {
+                for(let c=0; c<SIZE; c++) {
+                    if(board[r][c] !== null) {
+                        for(let dr=-1; dr<=1; dr++) {
+                            for(let dc=-1; dc<=1; dc++) {
+                                if(dr===0 && dc===0) continue;
+                                let nr = r+dr, nc = c+dc;
+                                if(nr>=0 && nr<SIZE && nc>=0 && nc<SIZE && board[nr][nc]===null) {
+                                    candidates.add(nr + "," + nc);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if(candidates.size === 0) { // Bàn cờ trống
+                makeMove(7, 7, 'O'); 
+                currentPlayer = 'X';
+                document.getElementById('status').innerText = `Turn: X`;
+                return;
+            }
+
+            candidates.forEach(pos => {
+                let [r, c] = pos.split(',').map(Number);
+                // Điểm tấn công (AI đánh O)
+                let attackScore = evaluate(r, c, 'O'); 
+                // Điểm phòng thủ (Chặn X)
+                let defenseScore = evaluate(r, c, 'X');
+                
+                // AI ưu tiên phòng thủ nếu đối phương sắp thắng
+                let score = attackScore + defenseScore;
+                
+                if(score > bestScore) {
+                    bestScore = score;
+                    moves = [{r, c}];
+                } else if (score === bestScore) {
+                    moves.push({r, c});
+                }
+            });
+
+            // Chọn ngẫu nhiên nếu có nhiều nước đi bằng điểm
+            const move = moves[Math.floor(Math.random() * moves.length)];
+            makeMove(move.r, move.c, 'O');
+
+            if(checkWin(move.r, move.c, 'O')) {
+                alert("AI WIN!");
+                gameActive = false;
+            } else {
+                currentPlayer = 'X';
+                document.getElementById('status').innerText = `Turn: X`;
+            }
+        }
+
+        function evaluate(r, c, player) {
+            let score = 0;
+            const dirs = [[1,0], [0,1], [1,1], [1,-1]];
+            
+            for(let [dr, dc] of dirs) {
+                let count = 0;
+                let blocked = 0;
+                
+                // Check hướng dương
+                for(let i=1; i<5; i++) {
+                    let nr = r + dr*i, nc = c + dc*i;
+                    if(nr<0 || nr>=SIZE || nc<0 || nc>=SIZE) { blocked++; break; }
+                    if(board[nr][nc] === player) count++;
+                    else if(board[nr][nc] !== null) { blocked++; break; }
+                    else break; 
+                }
+                // Check hướng âm
+                for(let i=1; i<5; i++) {
+                    let nr = r - dr*i, nc = c - dc*i;
+                    if(nr<0 || nr>=SIZE || nc<0 || nc>=SIZE) { blocked++; break; }
+                    if(board[nr][nc] === player) count++;
+                    else if(board[nr][nc] !== null) { blocked++; break; }
+                    else break;
+                }
+
+                // Hệ điểm
+                if(count >= 4) score += 100000;       // 5 in a row (Win)
+                else if(count === 3 && blocked === 0) score += 10000; // Open 4
+                else if(count === 2 && blocked === 0) score += 1000;  // Open 3
+                else if(count === 3 && blocked === 1) score += 100;   // Blocked 4
+                else if(count === 2 && blocked === 1) score += 10;    // Blocked 3
+                else if(count === 1) score += 1;
+            }
+            return score;
+        }
+    </script>
+</body>
+</html>
+
