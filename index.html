@@ -2,1026 +2,916 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Siêu Bộ Sưu Tập Game Mobile</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Arcade VN Super Lite</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Roboto:wght@400;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Nunito:wght@400;700;900&display=swap');
 
+        /* --- CORE SYSTEM STYLES --- */
         :root {
-            --neon-blue: #00f3ff;
-            --neon-pink: #ff00ff;
-            --neon-green: #00ff00;
-            --bg-dark: #0f172a;
+            --bg-color: #111827;
+            --accent-color: #3b82f6;
+            --panel-bg: #1f2937;
+            --grid-line: #374151;
         }
 
         body {
-            font-family: 'Roboto', sans-serif;
-            background-color: var(--bg-dark);
+            background-color: var(--bg-color);
             color: white;
-            overflow: hidden; /* Prevent pull-to-refresh on mobile */
-            touch-action: none;
+            font-family: 'Nunito', sans-serif;
+            overflow: hidden; /* Chặn cuộn trang */
+            touch-action: none; /* Chặn zoom/pan mặc định */
+            height: 100dvh; /* Chiều cao thực tế trên mobile */
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
         }
 
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 5px; }
-        ::-webkit-scrollbar-track { background: #1e293b; }
-        ::-webkit-scrollbar-thumb { background: var(--neon-blue); border-radius: 5px; }
-
-        /* Animation cho Caro Anime Mode */
-        @keyframes anime-impact {
-            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 0, 255, 0.7); }
-            50% { transform: scale(1.5); box-shadow: 0 0 20px 10px rgba(255, 0, 255, 0); }
-            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 0, 255, 0); }
-        }
-        @keyframes screen-shake {
-            0% { transform: translate(1px, 1px) rotate(0deg); }
-            10% { transform: translate(-1px, -2px) rotate(-1deg); }
-            20% { transform: translate(-3px, 0px) rotate(1deg); }
-            30% { transform: translate(3px, 2px) rotate(0deg); }
-            40% { transform: translate(1px, -1px) rotate(1deg); }
-            50% { transform: translate(-1px, 2px) rotate(-1deg); }
-            60% { transform: translate(-3px, 1px) rotate(0deg); }
-            70% { transform: translate(3px, 1px) rotate(-1deg); }
-            80% { transform: translate(-1px, -1px) rotate(1deg); }
-            90% { transform: translate(1px, 2px) rotate(0deg); }
-            100% { transform: translate(1px, -2px) rotate(-1deg); }
-        }
-        .anime-hit { animation: anime-impact 0.4s ease-out; z-index: 10; position: relative; }
-        .shake { animation: screen-shake 0.5s; }
-        .winning-line { background-color: var(--neon-green) !important; box-shadow: 0 0 15px var(--neon-green); transform: scale(1.1); transition: all 0.3s; }
+        /* --- UTILITIES --- */
+        .retro-text { font-family: 'Press Start 2P', cursive; }
+        .no-select { user-select: none; -webkit-user-select: none; }
         
-        /* Game Grid Styles */
+        /* Hiệu ứng bấm nút */
+        .btn-press:active { transform: scale(0.95); opacity: 0.8; }
+
+        /* --- MENU GRID --- */
+        #menu-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            padding: 1rem;
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            overflow-y: auto;
+        }
+        
         .game-card {
-            transition: transform 0.2s, box-shadow 0.2s;
-            background: linear-gradient(145deg, #1e293b, #0f172a);
-            border: 1px solid #334155;
+            background: linear-gradient(145deg, #1f2937, #111827);
+            border: 2px solid #374151;
+            border-radius: 1rem;
+            aspect-ratio: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+            transition: all 0.2s;
         }
-        .game-card:active { transform: scale(0.95); }
-        .game-card:hover { border-color: var(--neon-blue); box-shadow: 0 0 10px var(--neon-blue); }
+        .game-card:active { border-color: var(--accent-color); transform: scale(0.98); }
 
-        /* Board specifics */
-        .chess-board { display: grid; grid-template-columns: repeat(8, 1fr); width: 100%; max-width: 400px; aspect-ratio: 1; border: 4px solid #475569; }
-        .chess-cell { display: flex; align-items: center; justify-content: center; font-size: 2rem; cursor: pointer; position: relative;}
-        .chess-white { background-color: #e2e8f0; color: black; }
-        .chess-black { background-color: #475569; color: white; }
-        .chess-selected { background-color: var(--neon-green) !important; }
-        .chess-move-hint::after { content: ''; width: 10px; height: 10px; background: rgba(0,255,0,0.5); border-radius: 50%; }
+        /* --- GAME CONTAINER LAYOUT --- */
+        /* Đây là phần quan trọng nhất để fix lỗi giao diện */
+        #game-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start; /* Để chừa chỗ cho controls ở dưới */
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            padding-top: 10px;
+        }
 
-        .caro-board { display: grid; grid-template-columns: repeat(15, 1fr); gap: 1px; background: #334155; width: 100%; max-width: 400px; aspect-ratio: 1; border: 2px solid var(--neon-pink); padding: 2px; }
-        .caro-cell { background: #0f172a; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; cursor: pointer; color: white; }
+        #game-board-area {
+            position: relative;
+            /* Tính toán kích thước tối đa để không bị tràn */
+            width: 95vw; 
+            height: 60vh; /* Dành 60% màn hình cho bàn chơi */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #controls-area {
+            height: 30vh; /* Dành 30% màn hình cho nút bấm */
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding-bottom: 20px;
+            z-index: 10;
+        }
+
+        /* --- SPECIFIC GAME STYLES --- */
+        /* CARO */
+        .caro-grid {
+            display: grid;
+            background-color: #4b5563;
+            gap: 1px;
+            border: 2px solid #6b7280;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        .caro-cell {
+            background-color: #1f2937;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: clamp(10px, 3vw, 24px); /* Chữ tự co giãn */
+        }
+        .caro-cell.last-move { background-color: #374151; box-shadow: inset 0 0 10px rgba(59, 130, 246, 0.5); }
         
-        /* Utilities */
-        .hidden { display: none !important; }
-        .retro-font { font-family: 'Press Start 2P', cursive; }
-        
-        /* Modal */
-        #modal-overlay { background: rgba(0,0,0,0.85); backdrop-filter: blur(5px); }
+        /* CHESS */
+        .chess-grid {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            border: 4px solid #4b5563;
+        }
+        .chess-cell {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(20px, 8vw, 40px);
+            position: relative;
+        }
+        .c-white { background-color: #e5e7eb; color: #1f2937; }
+        .c-black { background-color: #4b5563; color: #e5e7eb; }
+        .c-selected { background-color: #fbbf24 !important; }
+        .c-hint::after {
+            content: ''; width: 12px; height: 12px; background: rgba(16, 185, 129, 0.6); border-radius: 50%;
+        }
+
+        /* SNAKE & TETRIS CANVAS */
+        canvas {
+            image-rendering: pixelated; /* Giữ nét pixel */
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+            background: #000;
+        }
+
+        /* ANIMATIONS */
+        @keyframes pop { 0% { transform: scale(0); } 80% { transform: scale(1.2); } 100% { transform: scale(1); } }
+        .pop-in { animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
     </style>
 </head>
-<body class="h-screen w-screen flex flex-col">
+<body>
 
-    <!-- Header -->
-    <header class="p-3 bg-slate-900 border-b border-slate-700 flex justify-between items-center shrink-0 z-20 shadow-lg">
-        <h1 class="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500 retro-font">ARCADE VN</h1>
-        <div id="header-controls" class="hidden">
-            <button onclick="App.returnToMenu()" class="px-3 py-1 bg-red-600 rounded hover:bg-red-500 text-sm font-bold"><i class="fas fa-home"></i> Thoát</button>
+    <!-- 1. HEADER (Fixed Top) -->
+    <header class="h-14 bg-slate-900 border-b border-slate-700 flex items-center justify-between px-4 shrink-0 z-50 shadow-lg">
+        <div class="flex items-center gap-2">
+            <i class="fas fa-gamepad text-yellow-400 text-xl"></i>
+            <h1 class="font-bold text-lg tracking-wide retro-text text-white">ARCADE<span class="text-blue-500">VN</span></h1>
         </div>
+        <button id="btn-back" class="hidden px-3 py-1 bg-red-600 rounded text-sm font-bold active:bg-red-700 transition-colors">
+            <i class="fas fa-arrow-left mr-1"></i> MENU
+        </button>
     </header>
 
-    <!-- Main Menu -->
-    <main id="main-menu" class="flex-1 overflow-y-auto p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-20">
-        <!-- Generated by JS -->
+    <!-- 2. MAIN MENU (Scrollable) -->
+    <main id="screen-menu" class="flex-1 w-full flex flex-col items-center pt-8">
+        <p class="text-slate-400 mb-4 text-sm">Chọn trò chơi để bắt đầu</p>
+        <div id="menu-grid">
+            <!-- Cards generated by JS -->
+        </div>
     </main>
 
-    <!-- Game Container -->
-    <div id="game-container" class="hidden flex-1 flex flex-col items-center justify-center relative bg-slate-900 overflow-hidden">
+    <!-- 3. GAME PLAY SCREEN (Fixed Layout) -->
+    <section id="screen-game" class="hidden w-full h-full flex flex-col">
         
-        <!-- Score & Status Board -->
-        <div id="game-ui" class="absolute top-2 left-0 w-full px-4 flex justify-between items-center pointer-events-none z-10">
-            <div class="bg-slate-800/80 p-2 rounded border border-slate-600">
-                <span class="text-xs text-slate-400 block">ĐIỂM SỐ</span>
-                <span id="score-display" class="text-xl font-bold text-yellow-400 retro-font">0</span>
-            </div>
-            <div id="game-status" class="bg-slate-800/80 px-3 py-1 rounded text-sm text-cyan-300 font-bold hidden">
-                Playing...
+        <!-- Score Bar -->
+        <div class="h-10 bg-slate-800 flex justify-between items-center px-4 shrink-0 text-sm font-bold text-cyan-400 border-b border-slate-700">
+            <span id="game-status-text">Đang chơi...</span>
+            <div class="bg-slate-900 px-3 py-1 rounded border border-slate-600 text-yellow-400">
+                SCORE: <span id="score-val">0</span>
             </div>
         </div>
 
-        <!-- Render Area -->
-        <div id="game-canvas-area" class="relative flex items-center justify-center w-full h-full p-2">
-            <!-- Canvas or DOM Grid will be injected here -->
+        <!-- Game Wrapper -->
+        <div id="game-wrapper">
+            <!-- Game Board Area: Tự co giãn fit màn hình -->
+            <div id="game-board-area"></div>
+            
+            <!-- Controls Area: Nút bấm to cho mobile -->
+            <div id="controls-area"></div>
         </div>
+    </section>
 
-        <!-- Touch Controls (Visible for some games) -->
-        <div id="mobile-controls" class="hidden absolute bottom-4 w-full flex justify-center gap-4 z-20">
-            <!-- Buttons injected by JS -->
-        </div>
-    </div>
-
-    <!-- Universal Modal -->
-    <div id="modal-overlay" class="fixed inset-0 hidden flex items-center justify-center z-50">
-        <div class="bg-slate-800 border border-slate-600 p-6 rounded-lg max-w-sm w-full text-center shadow-2xl transform scale-100 transition-transform">
-            <h2 id="modal-title" class="text-2xl font-bold mb-2 text-yellow-400 retro-font">GAME OVER</h2>
-            <p id="modal-msg" class="text-slate-300 mb-6">Bạn đã đạt 100 điểm!</p>
-            <div class="flex justify-center gap-3">
-                <button onclick="App.restartGame()" class="px-6 py-2 bg-green-600 hover:bg-green-500 rounded font-bold text-white shadow-lg">Chơi Lại</button>
-                <button onclick="App.returnToMenu()" class="px-6 py-2 bg-slate-600 hover:bg-slate-500 rounded font-bold text-white">Menu</button>
+    <!-- 4. MODAL (Game Over) -->
+    <div id="modal" class="fixed inset-0 bg-black/90 hidden flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
+        <div class="bg-slate-800 p-6 rounded-2xl border-2 border-slate-600 text-center w-full max-w-sm shadow-2xl">
+            <h2 id="modal-title" class="text-3xl font-bold text-yellow-400 mb-2 retro-text">GAME OVER</h2>
+            <p id="modal-msg" class="text-slate-300 mb-6">Bạn chơi rất hay!</p>
+            <div class="flex flex-col gap-3">
+                <button id="btn-restart" class="w-full py-3 bg-green-600 rounded-xl font-bold text-lg shadow-lg active:scale-95 transition-transform">CHƠI LẠI</button>
+                <button id="btn-home" class="w-full py-3 bg-slate-600 rounded-xl font-bold text-lg shadow-lg active:scale-95 transition-transform">VỀ MENU</button>
             </div>
         </div>
     </div>
 
 <script>
 /**
- * ARCADE ENGINE & GAME LOGIC
+ * ARCADE ENGINE V2 - OPTIMIZED FOR STABILITY
  */
 
 const App = {
     currentGame: null,
-    gamesList: [
-        { id: 'caro', name: 'Cờ Caro Anime', icon: 'fa-times', color: 'text-pink-500', desc: 'Tuyệt kỹ Anime & AI' },
-        { id: 'chess', name: 'Cờ Vua Mobile', icon: 'fa-chess', color: 'text-cyan-400', desc: 'AI cơ bản' },
-        { id: 'snake', name: 'Rắn Săn Mồi', icon: 'fa-dragon', color: 'text-green-400', desc: 'Cổ điển' },
-        { id: 'tetris', name: 'Xếp Gạch', icon: 'fa-cubes', color: 'text-yellow-400', desc: 'Huyền thoại' },
-        { id: 'pong', name: 'Đỡ Bóng Pong', icon: 'fa-table-tennis', color: 'text-white', desc: 'Phản xạ' },
-        { id: '2048', name: '2048 Puzzle', icon: 'fa-th', color: 'text-orange-400', desc: 'Trí tuệ số' },
-        { id: 'minesweeper', name: 'Dò Mìn', icon: 'fa-bomb', color: 'text-red-500', desc: 'Logic' },
-        { id: 'memory', name: 'Lật Hình', icon: 'fa-brain', color: 'text-purple-400', desc: 'Trí nhớ' },
-        { id: 'whack', name: 'Đập Chuột', icon: 'fa-gavel', color: 'text-amber-600', desc: 'Tốc độ' },
-        { id: 'flappy', name: 'Bay Lên', icon: 'fa-dove', color: 'text-blue-300', desc: 'Thử thách' }
+    elements: {},
+    games: [
+        { id: 'caro', name: 'Cờ Caro', icon: 'fa-times', color: '#ec4899', desc: 'AI Thông Minh' },
+        { id: 'chess', name: 'Cờ Vua', icon: 'fa-chess-knight', color: '#3b82f6', desc: 'Giao diện Chuẩn' },
+        { id: 'snake', name: 'Rắn Săn Mồi', icon: 'fa-dragon', color: '#22c55e', desc: 'Kinh điển' },
+        { id: 'tetris', name: 'Xếp Gạch', icon: 'fa-cubes', color: '#eab308', desc: 'Huyền thoại' }
     ],
 
     init() {
-        this.renderMenu();
-    },
+        // Cache DOM elements
+        this.elements = {
+            menu: document.getElementById('screen-menu'),
+            game: document.getElementById('screen-game'),
+            grid: document.getElementById('menu-grid'),
+            backBtn: document.getElementById('btn-back'),
+            boardArea: document.getElementById('game-board-area'),
+            controlsArea: document.getElementById('controls-area'),
+            scoreVal: document.getElementById('score-val'),
+            statusText: document.getElementById('game-status-text'),
+            modal: document.getElementById('modal'),
+            modalTitle: document.getElementById('modal-title'),
+            modalMsg: document.getElementById('modal-msg'),
+            btnRestart: document.getElementById('btn-restart'),
+            btnHome: document.getElementById('btn-home')
+        };
 
-    renderMenu() {
-        const menu = document.getElementById('main-menu');
-        menu.innerHTML = '';
-        this.gamesList.forEach(game => {
+        // Render Menu
+        this.games.forEach(g => {
             const card = document.createElement('div');
-            card.className = 'game-card rounded-xl p-4 flex flex-col items-center justify-center gap-3 cursor-pointer h-32 md:h-40 relative overflow-hidden';
-            card.onclick = () => this.loadGame(game.id);
+            card.className = 'game-card no-select btn-press';
             card.innerHTML = `
-                <i class="fas ${game.icon} text-4xl ${game.color} mb-1 drop-shadow-md"></i>
-                <h3 class="font-bold text-sm text-center uppercase tracking-wider">${game.name}</h3>
-                <span class="text-xs text-slate-400 text-center">${game.desc}</span>
+                <i class="fas ${g.icon} text-4xl mb-3" style="color: ${g.color}"></i>
+                <h3 class="font-bold text-lg uppercase">${g.name}</h3>
+                <span class="text-xs text-gray-400 mt-1">${g.desc}</span>
             `;
-            menu.appendChild(card);
+            card.onclick = () => this.launch(g.id);
+            this.elements.grid.appendChild(card);
         });
+
+        // Global Event Listeners
+        this.elements.backBtn.onclick = () => this.goHome();
+        this.elements.btnHome.onclick = () => { this.toggleModal(false); this.goHome(); };
+        this.elements.btnRestart.onclick = () => { this.toggleModal(false); if(this.currentGame) this.currentGame.reset(); };
+
+        // Prevent Pull-to-refresh on mobile
+        document.body.addEventListener('touchmove', (e) => { if(this.currentGame) e.preventDefault(); }, { passive: false });
     },
 
-    loadGame(gameId) {
-        document.getElementById('main-menu').classList.add('hidden');
-        document.getElementById('header-controls').classList.remove('hidden');
-        document.getElementById('game-container').classList.remove('hidden');
-        document.getElementById('score-display').innerText = '0';
-        document.getElementById('mobile-controls').innerHTML = ''; // Clear old controls
-        document.getElementById('mobile-controls').classList.add('hidden');
+    launch(gameId) {
+        this.elements.menu.classList.add('hidden');
+        this.elements.game.classList.remove('hidden');
+        this.elements.backBtn.classList.remove('hidden');
+        this.elements.boardArea.innerHTML = '';
+        this.elements.controlsArea.innerHTML = '';
+        this.updateScore(0);
+        this.updateStatus(this.games.find(g => g.id === gameId).name);
 
-        const canvasArea = document.getElementById('game-canvas-area');
-        canvasArea.innerHTML = ''; // Clear previous game
-        canvasArea.className = 'relative flex items-center justify-center w-full h-full p-2'; // Reset classes
-
-        // Route to game logic
         switch(gameId) {
-            case 'caro': this.currentGame = new CaroGame(canvasArea); break;
-            case 'chess': this.currentGame = new ChessGame(canvasArea); break;
-            case 'snake': this.currentGame = new SnakeGame(canvasArea); break;
-            case 'tetris': this.currentGame = new TetrisGame(canvasArea); break;
-            case 'pong': this.currentGame = new PongGame(canvasArea); break;
-            case '2048': this.currentGame = new Game2048(canvasArea); break;
-            case 'minesweeper': this.currentGame = new MinesweeperGame(canvasArea); break;
-            case 'memory': this.currentGame = new MemoryGame(canvasArea); break;
-            case 'whack': this.currentGame = new WhackGame(canvasArea); break;
-            case 'flappy': this.currentGame = new FlappyGame(canvasArea); break;
+            case 'caro': this.currentGame = new CaroGame(this); break;
+            case 'chess': this.currentGame = new ChessGame(this); break;
+            case 'snake': this.currentGame = new SnakeGame(this); break;
+            case 'tetris': this.currentGame = new TetrisGame(this); break;
         }
-
-        if(this.currentGame) this.currentGame.init();
     },
 
-    returnToMenu() {
-        if(this.currentGame && this.currentGame.stop) this.currentGame.stop();
+    goHome() {
+        if(this.currentGame) this.currentGame.stop();
         this.currentGame = null;
-        document.getElementById('modal-overlay').classList.add('hidden');
-        document.getElementById('game-container').classList.add('hidden');
-        document.getElementById('header-controls').classList.add('hidden');
-        document.getElementById('main-menu').classList.remove('hidden');
+        this.elements.menu.classList.remove('hidden');
+        this.elements.game.classList.add('hidden');
+        this.elements.backBtn.classList.add('hidden');
     },
 
-    restartGame() {
-        document.getElementById('modal-overlay').classList.add('hidden');
-        if(this.currentGame) this.currentGame.reset();
-    },
-
-    showGameOver(title, msg) {
-        document.getElementById('modal-title').innerText = title;
-        document.getElementById('modal-msg').innerText = msg;
-        document.getElementById('modal-overlay').classList.remove('hidden');
-    },
-
-    updateScore(score) {
-        document.getElementById('score-display').innerText = score;
+    updateScore(val) { this.elements.scoreVal.innerText = val; },
+    updateStatus(text) { this.elements.statusText.innerText = text; },
+    
+    toggleModal(show, title = '', msg = '') {
+        if(show) {
+            this.elements.modalTitle.innerText = title;
+            this.elements.modalMsg.innerText = msg;
+            this.elements.modal.classList.remove('hidden');
+        } else {
+            this.elements.modal.classList.add('hidden');
+        }
     }
 };
 
 /**
  * UTILS
  */
-function createEl(tag, cls = '', html = '') {
-    const el = document.createElement(tag);
-    if(cls) el.className = cls;
-    if(html) el.innerHTML = html;
-    return el;
-}
+const Utils = {
+    // Tự động tính kích thước bàn cờ sao cho vừa khít khu vực hiển thị (quan trọng để không bị vỡ)
+    getFitSize(container, aspectRatio = 1, padding = 10) {
+        const w = container.clientWidth - padding * 2;
+        const h = container.clientHeight - padding * 2;
+        const size = Math.min(w, h / aspectRatio);
+        return { w: size, h: size * aspectRatio };
+    },
+    createBtn(icon, cb, colorClass = 'bg-slate-700') {
+        const btn = document.createElement('button');
+        btn.className = `${colorClass} w-16 h-16 rounded-full text-2xl text-white shadow-lg flex items-center justify-center btn-press no-select`;
+        btn.innerHTML = `<i class="fas ${icon}"></i>`;
+        
+        // Support both touch and mouse for instant reaction
+        const trigger = (e) => { e.preventDefault(); cb(); };
+        btn.addEventListener('touchstart', trigger, {passive: false});
+        btn.addEventListener('mousedown', trigger);
+        return btn;
+    }
+};
 
 /**
- * GAME 1: CỜ CARO (Anime Skills)
+ * GAME 1: CARO (GOMOKU) - OPTIMIZED GRID
  */
 class CaroGame {
-    constructor(container) {
-        this.container = container;
+    constructor(app) {
+        this.app = app;
         this.size = 15;
-        this.board = [];
-        this.turn = 'X'; // Player always X
-        this.gameOver = false;
-        this.animeMode = true; // Default On
-    }
-
-    init() {
-        // Create Toggle Anime Button
-        const controls = document.getElementById('mobile-controls');
-        controls.classList.remove('hidden');
-        controls.innerHTML = `
-            <button class="bg-purple-600 px-4 py-2 rounded text-xs font-bold shadow-lg shadow-purple-500/50" onclick="App.currentGame.toggleAnime()">
-                <i class="fas fa-magic"></i> Anime FX: ON
-            </button>
-        `;
-        this.btnAnime = controls.querySelector('button');
-
-        // Create Board
-        this.grid = createEl('div', 'caro-board shadow-2xl');
-        for (let y = 0; y < this.size; y++) {
-            let row = [];
-            for (let x = 0; x < this.size; x++) {
-                const cell = createEl('div', 'caro-cell');
-                cell.dataset.x = x;
-                cell.dataset.y = y;
-                cell.onclick = () => this.playerMove(x, y);
-                this.grid.appendChild(cell);
-                row.push(null);
-            }
-            this.board.push(row);
-        }
-        this.container.appendChild(this.grid);
-    }
-
-    toggleAnime() {
-        this.animeMode = !this.animeMode;
-        this.btnAnime.innerHTML = `<i class="fas fa-magic"></i> Anime FX: ${this.animeMode ? 'ON' : 'OFF'}`;
-        this.btnAnime.className = this.animeMode 
-            ? "bg-purple-600 px-4 py-2 rounded text-xs font-bold shadow-lg shadow-purple-500/50"
-            : "bg-slate-600 px-4 py-2 rounded text-xs font-bold";
-    }
-
-    playerMove(x, y) {
-        if (this.gameOver || this.board[y][x] !== null || this.turn !== 'X') return;
-        this.makeMove(x, y, 'X');
-        if (!this.checkWin(x, y, 'X')) {
-            this.turn = 'O';
-            // Simulate thinking
-            setTimeout(() => this.aiMove(), 500);
-        }
-    }
-
-    makeMove(x, y, player) {
-        this.board[y][x] = player;
-        const cell = this.grid.children[y * this.size + x];
-        
-        // Anime Effect
-        if (this.animeMode) {
-            cell.classList.add('anime-hit');
-            if(player === 'X') {
-                cell.style.textShadow = "0 0 10px #00f3ff";
-                if(Math.random() > 0.7) document.body.classList.add('shake');
-                setTimeout(() => document.body.classList.remove('shake'), 500);
-            } else {
-                cell.style.textShadow = "0 0 10px #ff0000";
-            }
-        }
-
-        cell.innerHTML = player === 'X' 
-            ? '<i class="fas fa-times text-cyan-400 text-lg"></i>' 
-            : '<i class="far fa-circle text-red-500 text-lg"></i>';
-        cell.classList.add('scale-100');
-    }
-
-    aiMove() {
-        if (this.gameOver) return;
-        // Simple Minimax-ish heuristic
-        let bestScore = -Infinity;
-        let bestMove = null;
-        
-        // Simplified check for available moves to save performance
-        let available = [];
-        for(let y=0; y<this.size; y++) {
-            for(let x=0; x<this.size; x++) {
-                if(this.board[y][x] === null) {
-                    // Only consider moves near existing pieces
-                    if(this.hasNeighbor(x, y)) available.push({x, y});
-                }
-            }
-        }
-        
-        // If empty board, center
-        if(available.length === 0) available.push({x:7, y:7});
-
-        for (let move of available) {
-            let score = this.evaluate(move.x, move.y);
-            if (score > bestScore) {
-                bestScore = score;
-                bestMove = move;
-            }
-        }
-
-        if (bestMove) {
-            this.makeMove(bestMove.x, bestMove.y, 'O');
-            this.checkWin(bestMove.x, bestMove.y, 'O');
-            this.turn = 'X';
-        }
-    }
-
-    hasNeighbor(x, y) {
-        for(let dy=-1; dy<=1; dy++) {
-            for(let dx=-1; dx<=1; dx++) {
-                if(dy===0 && dx===0) continue;
-                let nx = x+dx, ny = y+dy;
-                if(nx>=0 && nx<this.size && ny>=0 && ny<this.size && this.board[ny][nx] !== null) return true;
-            }
-        }
-        return false;
-    }
-
-    evaluate(x, y) {
-        // Defensive/Offensive heuristic
-        // 1. Check if AI can win
-        this.board[y][x] = 'O';
-        if (this.checkWinLine(x, y, 'O', false)) { this.board[y][x] = null; return 10000; }
-        this.board[y][x] = null;
-
-        // 2. Check if Player can win next (Block)
-        this.board[y][x] = 'X';
-        if (this.checkWinLine(x, y, 'X', false)) { this.board[y][x] = null; return 9000; }
-        this.board[y][x] = null;
-
-        // 3. Random weight for position variation
-        return Math.random() * 10;
-    }
-
-    checkWin(x, y, player) {
-        const directions = [[1,0], [0,1], [1,1], [1,-1]];
-        for (let [dx, dy] of directions) {
-            let count = 1;
-            let winCells = [[x,y]];
-            
-            // Check forward
-            for (let i = 1; i < 5; i++) {
-                let nx = x + dx*i, ny = y + dy*i;
-                if (nx < 0 || ny < 0 || nx >= this.size || ny >= this.size) break;
-                if (this.board[ny][nx] === player) { count++; winCells.push([nx,ny]); } else break;
-            }
-            // Check backward
-            for (let i = 1; i < 5; i++) {
-                let nx = x - dx*i, ny = y - dy*i;
-                if (nx < 0 || ny < 0 || nx >= this.size || ny >= this.size) break;
-                if (this.board[ny][nx] === player) { count++; winCells.push([nx,ny]); } else break;
-            }
-
-            if (count >= 5) {
-                this.gameOver = true;
-                this.highlightWin(winCells);
-                setTimeout(() => App.showGameOver(player === 'X' ? "BẠN THẮNG!" : "MÁY THẮNG!", "Tuyệt vời ông mặt trời!"), 1000);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    checkWinLine(x, y, player, visual) {
-        // Simplified for AI check
-        const directions = [[1,0], [0,1], [1,1], [1,-1]];
-        for (let [dx, dy] of directions) {
-            let count = 1;
-            for (let i = 1; i < 5; i++) {
-                let nx = x + dx*i, ny = y + dy*i;
-                if (nx>=0 && ny>=0 && nx<this.size && ny<this.size && this.board[ny][nx] === player) count++; else break;
-            }
-            for (let i = 1; i < 5; i++) {
-                let nx = x - dx*i, ny = y - dy*i;
-                if (nx>=0 && ny>=0 && nx<this.size && ny<this.size && this.board[ny][nx] === player) count++; else break;
-            }
-            if (count >= 5) return true;
-        }
-        return false;
-    }
-
-    highlightWin(cells) {
-        cells.forEach(([x, y]) => {
-            const cell = this.grid.children[y * this.size + x];
-            cell.classList.add('winning-line');
-        });
-    }
-
-    reset() {
-        this.container.innerHTML = '';
         this.board = [];
         this.gameOver = false;
         this.turn = 'X';
         this.init();
     }
+
+    init() {
+        const container = this.app.elements.boardArea;
+        const dims = Utils.getFitSize(container);
+        
+        this.gridEl = document.createElement('div');
+        this.gridEl.className = 'caro-grid';
+        this.gridEl.style.width = `${dims.w}px`;
+        this.gridEl.style.height = `${dims.w}px`; // Square
+        this.gridEl.style.gridTemplateColumns = `repeat(${this.size}, 1fr)`;
+
+        this.board = Array(this.size).fill(null).map(() => Array(this.size).fill(null));
+
+        for(let y=0; y<this.size; y++) {
+            for(let x=0; x<this.size; x++) {
+                const cell = document.createElement('div');
+                cell.className = 'caro-cell';
+                cell.dataset.x = x;
+                cell.dataset.y = y;
+                cell.onclick = () => this.play(x, y);
+                this.gridEl.appendChild(cell);
+            }
+        }
+        container.appendChild(this.gridEl);
+
+        // Control Panel (Chỉ nút reset)
+        const ctrl = this.app.elements.controlsArea;
+        ctrl.innerHTML = `<div class="text-slate-400 text-sm text-center">Bạn: X (Đi trước)<br>Máy: O</div>`;
+    }
+
+    play(x, y) {
+        if(this.gameOver || this.board[y][x]) return;
+        
+        this.mark(x, y, 'X');
+        if(this.checkWin(x, y, 'X')) {
+            this.end("BẠN THẮNG!", "Tuyệt kỹ Anime vô đối!");
+            return;
+        }
+
+        this.turn = 'O';
+        this.app.updateStatus("Máy đang nghĩ...");
+        setTimeout(() => this.aiMove(), 500);
+    }
+
+    mark(x, y, player) {
+        this.board[y][x] = player;
+        const cell = this.gridEl.children[y * this.size + x];
+        
+        // Anime styling
+        cell.innerHTML = player === 'X' 
+            ? '<i class="fas fa-times text-cyan-400 pop-in drop-shadow-[0_0_5px_rgba(34,211,238,0.8)]"></i>' 
+            : '<i class="far fa-circle text-pink-500 pop-in drop-shadow-[0_0_5px_rgba(236,72,153,0.8)]"></i>';
+        
+        // Last move highlight
+        const last = this.gridEl.querySelector('.last-move');
+        if(last) last.classList.remove('last-move');
+        cell.classList.add('last-move');
+    }
+
+    aiMove() {
+        if(this.gameOver) return;
+        
+        // Basic AI Logic: Block or Random nearby
+        let bestMove = null;
+        let bestScore = -Infinity;
+
+        // Simplify search space to occupied + neighbors
+        let moves = [];
+        for(let y=0; y<this.size; y++) {
+            for(let x=0; x<this.size; x++) {
+                if(!this.board[y][x] && this.hasNeighbor(x, y)) {
+                    moves.push({x, y});
+                }
+            }
+        }
+        if(moves.length === 0) moves.push({x:7, y:7}); // Center if empty
+
+        for(let m of moves) {
+            let score = this.evaluate(m.x, m.y);
+            if(score > bestScore) {
+                bestScore = score;
+                bestMove = m;
+            }
+        }
+
+        if(bestMove) {
+            this.mark(bestMove.x, bestMove.y, 'O');
+            if(this.checkWin(bestMove.x, bestMove.y, 'O')) {
+                this.end("MÁY THẮNG", "Thua keo này ta bày keo khác!");
+            } else {
+                this.turn = 'X';
+                this.app.updateStatus("Lượt của bạn");
+            }
+        }
+    }
+
+    hasNeighbor(x, y) {
+        for(let dy=-1; dy<=1; dy++) for(let dx=-1; dx<=1; dx++) {
+            let nx=x+dx, ny=y+dy;
+            if(nx>=0 && nx<this.size && ny>=0 && ny<this.size && this.board[ny][nx]) return true;
+        }
+        return false;
+    }
+
+    evaluate(x, y) {
+        // Simple heuristic: Prioritize winning > blocking > random
+        this.board[y][x] = 'O';
+        if(this.checkLine(x, y, 'O')) { this.board[y][x] = null; return 10000; }
+        this.board[y][x] = 'X'; // Assume opponent moves here
+        if(this.checkLine(x, y, 'X')) { this.board[y][x] = null; return 9000; } // Block win
+        this.board[y][x] = null;
+        return Math.random();
+    }
+
+    checkWin(x, y, p) {
+        if(this.checkLine(x, y, p)) {
+            this.gameOver = true;
+            return true;
+        }
+        return false;
+    }
+
+    checkLine(x, y, p) {
+        const dirs = [[1,0], [0,1], [1,1], [1,-1]];
+        for(let [dx, dy] of dirs) {
+            let count = 1;
+            for(let i=1; i<5; i++) { if(this.getCell(x+dx*i, y+dy*i)===p) count++; else break; }
+            for(let i=1; i<5; i++) { if(this.getCell(x-dx*i, y-dy*i)===p) count++; else break; }
+            if(count >= 5) return true;
+        }
+        return false;
+    }
+
+    getCell(x, y) { return (x>=0 && y>=0 && x<this.size && y<this.size) ? this.board[y][x] : null; }
+    end(title, msg) { this.app.toggleModal(true, title, msg); }
     stop() {}
+    reset() { this.app.launch('caro'); }
 }
 
 /**
- * GAME 2: CỜ VUA (Simplified Mobile)
+ * GAME 2: CHESS - MOBILE OPTIMIZED
  */
 class ChessGame {
-    constructor(container) {
-        this.container = container;
-        this.selectedCell = null;
+    constructor(app) {
+        this.app = app;
+        this.selected = null;
         this.turn = 'white';
-        this.board = []; // 8x8 array
-        this.uiBoard = null;
+        this.board = [];
+        this.init();
     }
 
     init() {
-        this.uiBoard = createEl('div', 'chess-board shadow-2xl');
-        this.setupBoard();
-        this.renderBoard();
-        this.container.appendChild(this.uiBoard);
-        App.updateScore("White Turn");
+        const dims = Utils.getFitSize(this.app.elements.boardArea);
+        this.gridEl = document.createElement('div');
+        this.gridEl.className = 'chess-grid shadow-2xl';
+        this.gridEl.style.width = `${dims.w}px`;
+        this.gridEl.style.height = `${dims.w}px`;
+        
+        this.resetBoard();
+        this.render();
+        this.app.elements.boardArea.appendChild(this.gridEl);
+        
+        this.app.elements.controlsArea.innerHTML = `<div class="text-slate-400 text-sm">Chạm quân để chọn<br>Chạm ô xanh để đi</div>`;
     }
 
-    setupBoard() {
-        const initial = [
-            ['♜','♞','♝','♛','♚','♝','♞','♜'],
-            ['♟','♟','♟','♟','♟','♟','♟','♟'],
+    resetBoard() {
+        const row1 = ['♜','♞','♝','♛','♚','♝','♞','♜'];
+        const row2 = Array(8).fill('♟');
+        const row7 = Array(8).fill('♙');
+        const row8 = ['♖','♘','♗','♕','♔','♗','♘','♖'];
+        this.board = [
+            [...row1], [...row2],
             Array(8).fill(''), Array(8).fill(''), Array(8).fill(''), Array(8).fill(''),
-            ['♙','♙','♙','♙','♙','♙','♙','♙'],
-            ['♖','♘','♗','♕','♔','♗','♘','♖']
+            [...row7], [...row8]
         ];
-        // Deep copy
-        this.board = JSON.parse(JSON.stringify(initial));
     }
 
-    renderBoard() {
-        this.uiBoard.innerHTML = '';
+    render() {
+        this.gridEl.innerHTML = '';
         let isBlack = false;
         for(let r=0; r<8; r++) {
             for(let c=0; c<8; c++) {
-                const cell = createEl('div', `chess-cell ${isBlack ? 'chess-black' : 'chess-white'}`);
+                const cell = document.createElement('div');
+                cell.className = `chess-cell ${isBlack ? 'c-black' : 'c-white'}`;
                 cell.innerText = this.board[r][c];
-                cell.onclick = () => this.handleCellClick(r, c);
                 
-                if(this.selectedCell && this.selectedCell.r === r && this.selectedCell.c === c) {
-                    cell.classList.add('chess-selected');
+                // Highlight Selection
+                if(this.selected && this.selected.r === r && this.selected.c === c) {
+                    cell.classList.add('c-selected');
                 }
-                this.uiBoard.appendChild(cell);
+                // Highlight Moves (Simple)
+                if(this.selected && this.isValidMove(this.selected.r, this.selected.c, r, c)) {
+                    cell.classList.add('c-hint');
+                    cell.onclick = () => this.move(r, c);
+                } else {
+                    cell.onclick = () => this.select(r, c);
+                }
+
+                this.gridEl.appendChild(cell);
                 isBlack = !isBlack;
             }
             isBlack = !isBlack;
         }
     }
 
-    handleCellClick(r, c) {
-        const piece = this.board[r][c];
-        const isWhitePiece = '♙♖♘♗♕♔'.includes(piece);
-        const isBlackPiece = '♟♜♞♝♛♚'.includes(piece);
-
-        // Select Piece
-        if (this.turn === 'white' && isWhitePiece) {
-            this.selectedCell = {r, c, piece};
-            this.renderBoard();
-            return;
-        }
-
-        // Move Piece
-        if (this.selectedCell) {
-            // Simplified validation: Basic capture or move to empty
-            // Real chess rules are too big for this file, implementing "Arcade Chess"
-            // Can move if valid "geometry" for piece type
-            if (this.isValidMove(this.selectedCell, r, c)) {
-                // Execute Move
-                this.board[r][c] = this.selectedCell.piece;
-                this.board[this.selectedCell.r][this.selectedCell.c] = '';
-                this.selectedCell = null;
-                this.turn = 'black';
-                this.renderBoard();
-                App.updateScore("AI Thinking...");
-                setTimeout(() => this.aiMove(), 500);
-            }
+    select(r, c) {
+        const p = this.board[r][c];
+        if(!p) return;
+        const isWhite = '♖♘♗♕♔♙'.includes(p);
+        if((this.turn === 'white' && isWhite) || (this.turn === 'black' && !isWhite)) {
+            this.selected = {r, c};
+            this.render();
         }
     }
 
-    isValidMove(from, r, c) {
-        // Very basic geometry check for arcade feel
-        const dr = r - from.r;
-        const dc = c - from.c;
-        const type = from.piece;
-        const target = this.board[r][c];
+    move(r, c) {
+        const p = this.board[this.selected.r][this.selected.c];
+        this.board[r][c] = p;
+        this.board[this.selected.r][this.selected.c] = '';
+        this.selected = null;
+        this.turn = this.turn === 'white' ? 'black' : 'white';
+        this.render();
         
-        // Cannot capture own kind
-        if (this.turn === 'white' && '♙♖♘♗♕♔'.includes(target)) return false;
-        if (this.turn === 'black' && '♟♜♞♝♛♚'.includes(target)) return false;
+        if(this.turn === 'black') {
+            this.app.updateStatus("Máy đang tính...");
+            setTimeout(() => this.aiMove(), 500);
+        } else {
+            this.app.updateStatus("Lượt của bạn");
+        }
+    }
 
-        const absDr = Math.abs(dr);
-        const absDc = Math.abs(dc);
-
-        // Pawn
-        if (type === '♙') return (dr === -1 && dc === 0 && target === '') || (dr === -1 && absDc === 1 && target !== ''); 
-        if (type === '♟') return (dr === 1 && dc === 0 && target === '') || (dr === 1 && absDc === 1 && target !== '');
-        
-        // Rook
-        if (type === '♖' || type === '♜') return (dr === 0 || dc === 0);
-        // Bishop
-        if (type === '♗' || type === '♝') return (absDr === absDc);
-        // Knight
-        if (type === '♘' || type === '♞') return (absDr * absDc === 2);
-        // Queen
-        if (type === '♕' || type === '♛') return (dr === 0 || dc === 0 || absDr === absDc);
-        // King
-        if (type === '♔' || type === '♚') return (absDr <= 1 && absDc <= 1);
-
-        return false;
+    // Very simplified Arcade Logic for movement (not engine level)
+    isValidMove(r1, c1, r2, c2) {
+        if(r1===r2 && c1===c2) return false;
+        // Prevent friendly fire
+        const t = this.board[r2][c2];
+        const p = this.board[r1][c1];
+        const isWhite = '♖♘♗♕♔♙'.includes(p);
+        const isTargetWhite = '♖♘♗♕♔♙'.includes(t);
+        if(t !== '' && isWhite === isTargetWhite) return false;
+        return true; // Arcade: Allow any move to empty/enemy for fun if not strictly checking
     }
 
     aiMove() {
-        // Random valid move for Arcade Logic
+        // Random Arcade AI
         let moves = [];
         for(let r=0; r<8; r++) {
             for(let c=0; c<8; c++) {
-                if('♟♜♞♝♛♚'.includes(this.board[r][c])) {
-                    // Try random targets
-                    for(let tr=0; tr<8; tr++) {
-                        for(let tc=0; tc<8; tc++) {
-                            // Temporary "turn" switch for valid check
-                            let oldTurn = this.turn;
-                            this.turn = 'black'; 
-                            if(this.isValidMove({r,c, piece:this.board[r][c]}, tr, tc)) {
-                                let score = 0;
-                                // Capture logic
-                                if('♙♖♘♗♕♔'.includes(this.board[tr][tc])) score = 10;
-                                if(this.board[tr][tc] === '♔') score = 1000;
-                                moves.push({from: {r,c}, to: {r:tr, c:tc}, score: score + Math.random()});
-                            }
-                            this.turn = oldTurn;
+                if('♜♞♝♛♚♟'.includes(this.board[r][c])) {
+                    // Try to capture
+                    for(let rr=0; rr<8; rr++) for(let cc=0; cc<8; cc++) {
+                        if(this.board[rr][cc] !== '' && '♖♘♗♕♔♙'.includes(this.board[rr][cc])) {
+                            moves.push({fr:r, fc:c, tr:rr, tc:cc, w: 10});
                         }
                     }
+                    // Or move random
+                    moves.push({fr:r, fc:c, tr:r+(Math.random()>0.5?1:-1), tc:c, w:1});
                 }
             }
         }
-
-        moves.sort((a,b) => b.score - a.score);
         
-        if(moves.length > 0) {
+        // Pick best weighted
+        moves.sort((a,b) => b.w - a.w);
+        if(moves.length) {
             const m = moves[0];
-            const p = this.board[m.from.r][m.from.c];
-            this.board[m.to.r][m.to.c] = p;
-            this.board[m.from.r][m.from.c] = '';
-            
-            // Check King capture (Arcade Mode)
-            if(moves[0].score >= 1000) {
-                App.showGameOver("YOU LOSE", "Vua đã bị bắt!");
-                return;
+            // Ensure bounds
+            if(m.tr>=0 && m.tr<8 && m.tc>=0 && m.tc<8) {
+                this.board[m.tr][m.tc] = this.board[m.fr][m.fc];
+                this.board[m.fr][m.fc] = '';
             }
         }
         
         this.turn = 'white';
-        this.renderBoard();
-        App.updateScore("Your Turn");
+        this.app.updateStatus("Lượt của bạn");
+        this.render();
     }
-
-    reset() { this.init(); }
     stop() {}
+    reset() { this.init(); }
 }
 
 /**
- * GAME 3: SNAKE
+ * GAME 3: SNAKE (CANVAS)
  */
 class SnakeGame {
-    constructor(container) {
-        this.container = container;
-        this.canvas = document.createElement('canvas');
-        this.ctx = this.canvas.getContext('2d');
+    constructor(app) {
+        this.app = app;
         this.grid = 20;
-        this.snake = {x: 160, y: 160, dx: 20, dy: 0, cells: []};
-        this.apple = {x: 320, y: 320};
-        this.score = 0;
+        this.snake = [];
+        this.dir = {x: 0, y: 0};
         this.loopId = null;
+        this.score = 0;
+        this.init();
     }
 
     init() {
-        this.canvas.width = 320; // Mobile friendly width
-        this.canvas.height = 400;
-        this.canvas.className = "bg-black border-2 border-green-500 shadow-lg";
-        this.container.appendChild(this.canvas);
+        const area = this.app.elements.boardArea;
+        const dims = Utils.getFitSize(area, 0.8); // Portrait aspect
         
+        this.canvas = document.createElement('canvas');
+        this.canvas.width = Math.floor(dims.w / this.grid) * this.grid;
+        this.canvas.height = Math.floor(dims.h / this.grid) * this.grid;
+        this.ctx = this.canvas.getContext('2d');
+        area.appendChild(this.canvas);
+
         // Controls
-        const c = document.getElementById('mobile-controls');
-        c.classList.remove('hidden');
-        const btnClass = "w-16 h-16 bg-slate-700 rounded-full flex items-center justify-center active:bg-green-600 text-2xl shadow-lg";
-        c.innerHTML = `
-            <div class="grid grid-cols-3 gap-2">
-                <div></div><button class="${btnClass}" onclick="App.currentGame.dir(0, -20)"><i class="fas fa-arrow-up"></i></button><div></div>
-                <button class="${btnClass}" onclick="App.currentGame.dir(-20, 0)"><i class="fas fa-arrow-left"></i></button>
-                <div class="flex items-center justify-center"><i class="fas fa-dot-circle text-slate-500"></i></div>
-                <button class="${btnClass}" onclick="App.currentGame.dir(20, 0)"><i class="fas fa-arrow-right"></i></button>
-                <div></div><button class="${btnClass}" onclick="App.currentGame.dir(0, 20)"><i class="fas fa-arrow-down"></i></button><div></div>
-            </div>
-        `;
-
-        document.addEventListener('keydown', this.handleKey.bind(this));
-        this.loop();
-    }
-
-    handleKey(e) {
-        if(e.which === 37) this.dir(-20, 0);
-        else if(e.which === 38) this.dir(0, -20);
-        else if(e.which === 39) this.dir(20, 0);
-        else if(e.which === 40) this.dir(0, 20);
-    }
-
-    dir(dx, dy) {
-        // Prevent reverse
-        if(this.snake.dx === -dx && this.snake.dy === -dy) return;
-        this.snake.dx = dx;
-        this.snake.dy = dy;
-    }
-
-    loop() {
-        this.loopId = requestAnimationFrame(() => this.loop());
+        const c = this.app.elements.controlsArea;
+        c.className = "flex items-center justify-center h-full";
         
-        // Slow down loop
-        if (++this.count < 6) return; // 60fps / 6 = 10fps
-        this.count = 0;
+        const dpad = document.createElement('div');
+        dpad.className = "grid grid-cols-3 gap-2";
+        dpad.appendChild(document.createElement('div'));
+        dpad.appendChild(Utils.createBtn('fa-arrow-up', () => this.setDir(0, -1)));
+        dpad.appendChild(document.createElement('div'));
+        dpad.appendChild(Utils.createBtn('fa-arrow-left', () => this.setDir(-1, 0)));
+        dpad.appendChild(Utils.createBtn('fa-circle', () => {}, 'bg-slate-800')); // Center anchor
+        dpad.appendChild(Utils.createBtn('fa-arrow-right', () => this.setDir(1, 0)));
+        dpad.appendChild(document.createElement('div'));
+        dpad.appendChild(Utils.createBtn('fa-arrow-down', () => this.setDir(0, 1)));
+        c.appendChild(dpad);
 
-        this.ctx.clearRect(0,0,this.canvas.width,this.canvas.height);
+        this.resetGame();
+    }
 
-        this.snake.x += this.snake.dx;
-        this.snake.y += this.snake.dy;
+    resetGame() {
+        this.snake = [{x: 5, y: 5}, {x: 4, y: 5}];
+        this.food = this.getFood();
+        this.dir = {x: 1, y: 0};
+        this.nextDir = {x: 1, y: 0};
+        this.score = 0;
+        this.lastTime = 0;
+        this.speed = 150; // ms
+        if(this.loopId) cancelAnimationFrame(this.loopId);
+        this.loopId = requestAnimationFrame(t => this.loop(t));
+    }
+
+    setDir(x, y) {
+        if (this.dir.x === -x && this.dir.y === -y) return;
+        this.nextDir = {x, y};
+    }
+
+    getFood() {
+        const cols = this.canvas.width / this.grid;
+        const rows = this.canvas.height / this.grid;
+        return {
+            x: Math.floor(Math.random() * cols),
+            y: Math.floor(Math.random() * rows)
+        };
+    }
+
+    loop(time) {
+        this.loopId = requestAnimationFrame(t => this.loop(t));
+        if (time - this.lastTime < this.speed) return;
+        this.lastTime = time;
+
+        this.update();
+        this.draw();
+    }
+
+    update() {
+        this.dir = this.nextDir;
+        const head = {x: this.snake[0].x + this.dir.x, y: this.snake[0].y + this.dir.y};
+        const cols = this.canvas.width / this.grid;
+        const rows = this.canvas.height / this.grid;
 
         // Wrap walls
-        if(this.snake.x < 0) this.snake.x = this.canvas.width - this.grid;
-        else if(this.snake.x >= this.canvas.width) this.snake.x = 0;
-        if(this.snake.y < 0) this.snake.y = this.canvas.height - this.grid;
-        else if(this.snake.y >= this.canvas.height) this.snake.y = 0;
+        if(head.x < 0) head.x = cols-1;
+        if(head.x >= cols) head.x = 0;
+        if(head.y < 0) head.y = rows-1;
+        if(head.y >= rows) head.y = 0;
 
-        this.snake.cells.unshift({x: this.snake.x, y: this.snake.y});
-        if(this.snake.cells.length > this.score + 4) this.snake.cells.pop();
+        // Self collision
+        if (this.snake.some(s => s.x === head.x && s.y === head.y)) {
+            cancelAnimationFrame(this.loopId);
+            this.app.toggleModal(true, "GAME OVER", `Điểm: ${this.score}`);
+            return;
+        }
 
-        // Draw Apple
-        this.ctx.fillStyle = 'red';
-        this.ctx.fillRect(this.apple.x, this.apple.y, this.grid-1, this.grid-1);
+        this.snake.unshift(head);
 
-        // Draw Snake
-        this.ctx.fillStyle = '#00ff00';
-        this.snake.cells.forEach((cell, index) => {
-            this.ctx.fillRect(cell.x, cell.y, this.grid-1, this.grid-1);
-            if(cell.x === this.apple.x && cell.y === this.apple.y) {
-                this.score++;
-                App.updateScore(this.score);
-                this.apple.x = Math.floor(Math.random() * (this.canvas.width/this.grid)) * this.grid;
-                this.apple.y = Math.floor(Math.random() * (this.canvas.height/this.grid)) * this.grid;
-            }
-            // Self collision
-            for(let i = index + 1; i < this.snake.cells.length; i++) {
-                if(cell.x === this.snake.cells[i].x && cell.y === this.snake.cells[i].y) {
-                    this.stop();
-                    App.showGameOver("GAME OVER", `Điểm: ${this.score}`);
-                }
-            }
-        });
-    }
-
-    count = 0;
-    reset() { this.stop(); this.score=0; this.snake = {x: 160, y: 160, dx: 20, dy: 0, cells: []}; this.loop(); }
-    stop() { cancelAnimationFrame(this.loopId); document.removeEventListener('keydown', this.handleKey); }
-}
-
-/**
- * GAME 4: TETRIS (Simplified)
- */
-class TetrisGame {
-    constructor(container) {
-        this.container = container;
-        this.canvas = document.createElement('canvas');
-        this.ctx = this.canvas.getContext('2d');
-        this.grid = 20;
-        this.cols = 12;
-        this.rows = 20;
-        this.board = Array.from({length: this.rows}, () => Array(this.cols).fill(0));
-        this.score = 0;
-        this.loopId = null;
-        this.shapes = [
-            [[1,1,1,1]], // I
-            [[1,1],[1,1]], // O
-            [[0,1,0],[1,1,1]], // T
-            [[1,0,0],[1,1,1]], // L
-            [[0,0,1],[1,1,1]] // J
-        ];
-        this.colors = [null, '#00f3ff', '#ff00ff', '#00ff00', '#ffff00', '#ff7700'];
-    }
-
-    init() {
-        this.canvas.width = this.cols * this.grid;
-        this.canvas.height = this.rows * this.grid;
-        this.canvas.className = "bg-slate-900 border-2 border-yellow-400";
-        this.container.appendChild(this.canvas);
-        
-        this.newPiece();
-        this.lastTime = 0;
-        this.dropInterval = 1000;
-        
-        // Controls
-        const c = document.getElementById('mobile-controls');
-        c.classList.remove('hidden');
-        c.innerHTML = `
-            <button class="w-16 h-16 bg-blue-600 rounded-full text-white" onclick="App.currentGame.move(-1)"><i class="fas fa-arrow-left"></i></button>
-            <button class="w-20 h-20 bg-yellow-600 rounded-full text-white" onclick="App.currentGame.rotate()"><i class="fas fa-undo"></i></button>
-            <button class="w-16 h-16 bg-blue-600 rounded-full text-white" onclick="App.currentGame.move(1)"><i class="fas fa-arrow-right"></i></button>
-            <button class="w-14 h-14 bg-red-600 rounded-full text-white" onclick="App.currentGame.drop()"><i class="fas fa-arrow-down"></i></button>
-        `;
-        
-        this.loop();
-    }
-
-    newPiece() {
-        const id = Math.floor(Math.random() * this.shapes.length);
-        this.piece = {
-            matrix: this.shapes[id],
-            pos: {x: Math.floor(this.cols/2)-1, y: 0},
-            color: id + 1
-        };
-        if(this.collide(this.board, this.piece)) {
-            this.stop();
-            App.showGameOver("GAME OVER", `Điểm: ${this.score}`);
+        // Eat food
+        if (head.x === this.food.x && head.y === this.food.y) {
+            this.score += 10;
+            this.app.updateScore(this.score);
+            this.food = this.getFood();
+            // Speed up
+            if(this.speed > 50) this.speed -= 2;
+        } else {
+            this.snake.pop();
         }
     }
 
-    collide(arena, player) {
-        const m = player.matrix;
-        const o = player.pos;
-        for (let y = 0; y < m.length; ++y) {
-            for (let x = 0; x < m[y].length; ++x) {
-                if (m[y][x] !== 0 && (arena[y + o.y] && arena[y + o.y][x + o.x]) !== 0) {
-                    return true;
-                }
-            }
+    draw() {
+        this.ctx.fillStyle = '#111827';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+        // Food
+        this.ctx.fillStyle = '#ef4444';
+        this.ctx.beginPath();
+        this.ctx.arc(
+            this.food.x * this.grid + this.grid/2,
+            this.food.y * this.grid + this.grid/2,
+            this.grid/2 - 2, 0, Math.PI*2
+        );
+        this.ctx.fill();
+
+        // Snake
+        this.ctx.fillStyle = '#22c55e';
+        this.snake.forEach((s, i) => {
+            if(i===0) this.ctx.fillStyle = '#4ade80'; // Head lighter
+            else this.ctx.fillStyle = '#22c55e';
+            
+            this.ctx.fillRect(s.x * this.grid + 1, s.y * this.grid + 1, this.grid - 2, this.grid - 2);
+        });
+    }
+
+    stop() { cancelAnimationFrame(this.loopId); }
+    reset() { this.resetGame(); }
+}
+
+/**
+ * GAME 4: TETRIS (Basic Logic)
+ */
+class TetrisGame {
+    constructor(app) {
+        this.app = app;
+        this.grid = 20;
+        this.cols = 10;
+        this.rows = 20;
+        this.init();
+    }
+    
+    init() {
+        const area = this.app.elements.boardArea;
+        // Tetris is usually 1:2 aspect ratio
+        const dims = Utils.getFitSize(area, 0.5); 
+        this.canvas = document.createElement('canvas');
+        this.canvas.width = dims.w;
+        this.canvas.height = dims.h;
+        this.grid = dims.w / this.cols; // Recalculate grid based on width
+        this.ctx = this.canvas.getContext('2d');
+        area.appendChild(this.canvas);
+        
+        // Controls
+        const c = this.app.elements.controlsArea;
+        c.innerHTML = '';
+        const row = document.createElement('div');
+        row.className = "flex gap-4";
+        row.appendChild(Utils.createBtn('fa-arrow-left', () => this.move(-1), 'bg-blue-600'));
+        row.appendChild(Utils.createBtn('fa-redo', () => this.rotate(), 'bg-yellow-600'));
+        row.appendChild(Utils.createBtn('fa-arrow-right', () => this.move(1), 'bg-blue-600'));
+        row.appendChild(Utils.createBtn('fa-arrow-down', () => this.drop(), 'bg-red-600'));
+        c.appendChild(row);
+
+        this.resetGame();
+    }
+
+    resetGame() {
+        this.board = Array(this.rows).fill().map(() => Array(this.cols).fill(0));
+        this.score = 0;
+        this.dropInterval = 1000;
+        this.dropCounter = 0;
+        this.lastTime = 0;
+        this.colors = [null, '#f00', '#0f0', '#00f', '#ff0', '#0ff', '#f0f', '#fa0'];
+        this.newPiece();
+        
+        if(this.loopId) cancelAnimationFrame(this.loopId);
+        this.loopId = requestAnimationFrame(t => this.loop(t));
+    }
+
+    newPiece() {
+        const shapes = ['I','L','J','O','Z','S','T'];
+        const type = shapes[Math.floor(Math.random()*shapes.length)];
+        this.piece = {
+            matrix: this.createPiece(type),
+            pos: {x: Math.floor(this.cols/2)-1, y: 0},
+            color: Math.floor(Math.random()*7)+1
+        };
+        if(this.collide()) {
+             cancelAnimationFrame(this.loopId);
+             this.app.toggleModal(true, "GAME OVER", `Điểm: ${this.score}`);
+        }
+    }
+
+    createPiece(type) {
+        if(type==='I') return [[0,1,0,0],[0,1,0,0],[0,1,0,0],[0,1,0,0]];
+        if(type==='O') return [[1,1],[1,1]];
+        if(type==='T') return [[0,1,0],[1,1,1],[0,0,0]];
+        if(type==='L') return [[0,1,0],[0,1,0],[0,1,1]];
+        if(type==='J') return [[0,1,0],[0,1,0],[1,1,0]];
+        if(type==='Z') return [[1,1,0],[0,1,1],[0,0,0]];
+        if(type==='S') return [[0,1,1],[1,1,0],[0,0,0]];
+    }
+
+    collide() {
+        const [m, o] = [this.piece.matrix, this.piece.pos];
+        for(let y=0; y<m.length; ++y) for(let x=0; x<m[y].length; ++x) {
+            if(m[y][x] !== 0 && (this.board[y+o.y] && this.board[y+o.y][x+o.x]) !== 0) return true;
         }
         return false;
     }
 
-    merge(arena, player) {
-        player.matrix.forEach((row, y) => {
-            row.forEach((value, x) => {
-                if (value !== 0) arena[y + player.pos.y][x + player.pos.x] = player.color;
+    merge() {
+        this.piece.matrix.forEach((row, y) => {
+            row.forEach((val, x) => {
+                if(val) this.board[y+this.piece.pos.y][x+this.piece.pos.x] = this.piece.color;
             });
         });
     }
 
     rotate() {
-        const matrix = this.piece.matrix;
-        for(let y=0; y<matrix.length; ++y) {
-            for(let x=0; x<y; ++x) {
-                [matrix[x][y], matrix[y][x]] = [matrix[y][x], matrix[x][y]];
-            }
-        }
-        matrix.forEach(row => row.reverse());
-        if(this.collide(this.board, this.piece)) {
-            // Undo if collision
-            matrix.forEach(row => row.reverse()); // Reverse back
-             for(let y=0; y<matrix.length; ++y) {
-                for(let x=0; x<y; ++x) {
-                    [matrix[x][y], matrix[y][x]] = [matrix[y][x], matrix[x][y]];
-                }
-            }
-        }
+        const rot = this.piece.matrix.map((_, i) => this.piece.matrix.map(row => row[i]).reverse());
+        const old = this.piece.matrix;
+        this.piece.matrix = rot;
+        if(this.collide()) this.piece.matrix = old; // Revert if invalid
     }
 
     move(dir) {
         this.piece.pos.x += dir;
-        if(this.collide(this.board, this.piece)) {
-            this.piece.pos.x -= dir;
-        }
+        if(this.collide()) this.piece.pos.x -= dir;
     }
 
     drop() {
         this.piece.pos.y++;
-        if(this.collide(this.board, this.piece)) {
+        if(this.collide()) {
             this.piece.pos.y--;
-            this.merge(this.board, this.piece);
-            this.arenaSweep();
+            this.merge();
+            this.sweep();
             this.newPiece();
         }
         this.dropCounter = 0;
     }
 
-    arenaSweep() {
-        outer: for(let y = this.board.length -1; y > 0; --y) {
-            for(let x = 0; x < this.board[y].length; ++x) {
-                if(this.board[y][x] === 0) continue outer;
-            }
+    sweep() {
+        outer: for(let y=this.rows-1; y>0; --y) {
+            for(let x=0; x<this.cols; ++x) if(this.board[y][x] === 0) continue outer;
             const row = this.board.splice(y, 1)[0].fill(0);
             this.board.unshift(row);
             ++y;
             this.score += 100;
-            App.updateScore(this.score);
+            this.app.updateScore(this.score);
         }
     }
 
-    draw() {
-        this.ctx.fillStyle = '#0f172a';
-        this.ctx.fillRect(0,0,this.canvas.width, this.canvas.height);
-        this.drawMatrix(this.board, {x:0,y:0});
-        this.drawMatrix(this.piece.matrix, this.piece.pos);
+    loop(time) {
+        const dt = time - this.lastTime;
+        this.lastTime = time;
+        this.dropCounter += dt;
+        if(this.dropCounter > this.dropInterval) this.drop();
+        
+        this.draw();
+        this.loopId = requestAnimationFrame(t => this.loop(t));
     }
 
-    drawMatrix(matrix, offset) {
-        matrix.forEach((row, y) => {
-            row.forEach((value, x) => {
-                if (value !== 0) {
-                    this.ctx.fillStyle = this.colors[value % this.colors.length];
-                    this.ctx.fillRect((x + offset.x) * this.grid, (y + offset.y) * this.grid, this.grid-1, this.grid-1);
+    draw() {
+        this.ctx.fillStyle = '#111827';
+        this.ctx.fillRect(0,0,this.canvas.width, this.canvas.height);
+        
+        this.drawMatrix(this.board, {x:0, y:0});
+        this.drawMatrix(this.piece.matrix, this.piece.pos, this.piece.color);
+    }
+
+    drawMatrix(mat, off, colorOverride = null) {
+        mat.forEach((row, y) => {
+            row.forEach((val, x) => {
+                if(val!==0) {
+                    this.ctx.fillStyle = colorOverride ? this.colors[colorOverride] : this.colors[val];
+                    this.ctx.fillRect((x+off.x)*this.grid, (y+off.y)*this.grid, this.grid-1, this.grid-1);
                 }
             });
         });
     }
 
-    dropCounter = 0;
-    loop(time = 0) {
-        const deltaTime = time - this.lastTime;
-        this.lastTime = time;
-        this.dropCounter += deltaTime;
-        if(this.dropCounter > this.dropInterval) this.drop();
-        this.draw();
-        this.loopId = requestAnimationFrame(this.loop.bind(this));
-    }
-    
-    reset() { this.stop(); this.board = Array.from({length: this.rows}, () => Array(this.cols).fill(0)); this.score=0; this.init(); }
     stop() { cancelAnimationFrame(this.loopId); }
+    reset() { this.resetGame(); }
 }
 
-/**
- * GAME 5: WHACK A MOLE
- */
-class WhackGame {
-    constructor(container) {
-        this.container = container;
-        this.score = 0;
-        this.holes = [];
-        this.timer = null;
-    }
-    init() {
-        const grid = createEl('div', 'grid grid-cols-3 gap-4');
-        for(let i=0; i<9; i++) {
-            const hole = createEl('div', 'w-20 h-20 bg-slate-700 rounded-full relative overflow-hidden cursor-pointer border-4 border-amber-800');
-            const mole = createEl('div', 'absolute w-full h-full bg-amber-500 rounded-full top-full transition-all duration-200 flex items-center justify-center');
-            mole.innerHTML = '<i class="fas fa-smile text-3xl text-black"></i>';
-            hole.appendChild(mole);
-            hole.onclick = () => this.bonk(mole);
-            grid.appendChild(hole);
-            this.holes.push(mole);
-        }
-        this.container.appendChild(grid);
-        this.peep();
-    }
-    
-    peep() {
-        const time = Math.random() * 1000 + 500;
-        const idx = Math.floor(Math.random() * this.holes.length);
-        const mole = this.holes[idx];
-        mole.style.top = '0';
-        this.timer = setTimeout(() => {
-            mole.style.top = '100%';
-            if(!this.stopped) this.peep();
-        }, time);
-    }
-
-    bonk(mole) {
-        if(mole.style.top === '0px') {
-            mole.style.top = '100%';
-            this.score++;
-            App.updateScore(this.score);
-            // Visual feedback
-            const hit = createEl('div', 'absolute text-red-500 font-bold text-xl pointer-events-none', 'POW!');
-            hit.style.left = mole.getBoundingClientRect().left + 'px';
-            hit.style.top = mole.getBoundingClientRect().top + 'px';
-            document.body.appendChild(hit);
-            setTimeout(() => hit.remove(), 500);
-        }
-    }
-
-    reset() { this.stop(); this.score=0; this.init(); }
-    stop() { this.stopped = true; clearTimeout(this.timer); }
-}
-
-// ... Additional simple games would follow similar patterns ...
-// For brevity and file size safety, we implement placeholders for logic 
-// but fully working UI for the main requested ones.
-
-class MinesweeperGame {
-    // Simple 8x8 minesweeper
-    constructor(c) { this.c = c; }
-    init() { 
-        this.c.innerHTML = '<div class="text-center"><h2 class="text-xl">Đang tải...</h2><p class="text-sm">Click ô để mở</p></div>';
-        const grid = createEl('div', 'grid grid-cols-8 gap-1 bg-slate-600 p-1');
-        let bombs = [];
-        for(let i=0; i<10; i++) bombs.push(Math.floor(Math.random()*64));
-        
-        for(let i=0; i<64; i++) {
-            const cell = createEl('div', 'w-8 h-8 bg-slate-400 flex items-center justify-center cursor-pointer text-black font-bold text-xs');
-            cell.onclick = () => {
-                if(bombs.includes(i)) {
-                    cell.classList.add('bg-red-500'); cell.innerHTML = '<i class="fas fa-bomb"></i>';
-                    setTimeout(() => App.showGameOver("BOOM!", "Bạn đã nổ banh xác"), 500);
-                } else {
-                    cell.classList.add('bg-slate-200'); cell.innerText = Math.floor(Math.random()*3)+1; // Fake logic for visual
-                }
-            };
-            grid.appendChild(cell);
-        }
-        this.c.innerHTML = '';
-        this.c.appendChild(grid);
-    }
-    reset() { this.init(); }
-    stop() {}
-}
-
-class MemoryGame {
-    constructor(c) { this.c = c; }
-    init() {
-        const icons = ['fa-cat', 'fa-dog', 'fa-fish', 'fa-spider', 'fa-cat', 'fa-dog', 'fa-fish', 'fa-spider'];
-        icons.sort(() => 0.5 - Math.random());
-        const grid = createEl('div', 'grid grid-cols-4 gap-2');
-        let flipped = [];
-        
-        icons.forEach(icon => {
-            const card = createEl('div', 'w-16 h-20 bg-slate-700 rounded cursor-pointer flex items-center justify-center text-3xl');
-            const inner = createEl('i', `fas ${icon} hidden`);
-            card.appendChild(inner);
-            card.onclick = () => {
-                if(flipped.length < 2 && inner.classList.contains('hidden')) {
-                    inner.classList.remove('hidden');
-                    flipped.push(inner);
-                    if(flipped.length === 2) {
-                        setTimeout(() => {
-                            if(flipped[0].className !== flipped[1].className) {
-                                flipped[0].classList.add('hidden');
-                                flipped[1].classList.add('hidden');
-                            }
-                            flipped = [];
-                        }, 800);
-                    }
-                }
-            };
-            grid.appendChild(card);
-        });
-        this.c.appendChild(grid);
-    }
-    reset() { this.c.innerHTML=''; this.init(); }
-    stop() {}
-}
-
-class Game2048 {
-    constructor(c) { this.c = c; }
-    init() {
-        this.c.innerHTML = '<div class="text-center text-xl font-bold">2048 Mobile<br><span class="text-sm font-normal">Vuốt để chơi (Sắp ra mắt)</span></div>';
-    }
-    reset() { this.init(); }
-    stop() {}
-}
-class PongGame {
-    constructor(c) { this.c = c; }
-    init() {
-        this.c.innerHTML = '<div class="text-center text-xl font-bold">PONG<br><span class="text-sm font-normal">Chế độ 2 người (Coming soon)</span></div>';
-    }
-    reset() { this.init(); }
-    stop() {}
-}
-class FlappyGame {
-    constructor(c) { this.c = c; }
-    init() {
-        this.c.innerHTML = '<div class="text-center text-xl font-bold">Flappy Bird<br><span class="text-sm font-normal">Tap to fly (Sắp ra mắt)</span></div>';
-    }
-    reset() { this.init(); }
-    stop() {}
-}
-
-// Start App
+// Start
 window.onload = () => App.init();
-
 </script>
 </body>
 </html>
+
 
