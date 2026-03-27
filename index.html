@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cờ Caro</title>
+    <title>Cờ Caro Cao Cấp</title>
     <style>
         :root {
             --bg-color: #0f172a;
@@ -42,7 +42,7 @@
             text-align: center;
             margin-bottom: 15px;
             width: 100%;
-            max-width: 600px;
+            max-width: 650px;
         }
 
         h1 {
@@ -57,8 +57,10 @@
 
         .controls {
             display: flex;
-            justify-content: space-between;
+            flex-wrap: wrap;
+            justify-content: center;
             align-items: center;
+            gap: 10px;
             background: var(--board-bg);
             padding: 10px 15px;
             border-radius: 12px;
@@ -66,7 +68,7 @@
             margin-bottom: 15px;
         }
 
-        .select-group select, .btn-reset {
+        .select-group select, .btn-action {
             background: var(--cell-bg);
             color: var(--text-color);
             border: none;
@@ -79,16 +81,16 @@
             transition: 0.2s;
         }
 
-        .select-group select:hover, .btn-reset:hover {
+        .select-group select:hover, .btn-action:hover {
             background: var(--last-move-bg);
         }
 
         .btn-reset {
-            background: var(--primary-color);
-            color: white;
+            background: var(--primary-color) !important;
+            color: white !important;
         }
         .btn-reset:hover {
-            background: #059669;
+            background: #059669 !important;
         }
 
         .status-bar {
@@ -97,6 +99,7 @@
             margin-bottom: 10px;
             display: flex;
             align-items: center;
+            justify-content: center;
             gap: 10px;
         }
 
@@ -110,11 +113,36 @@
         .turn-x { color: var(--x-color); border: 1px solid var(--x-color); }
         .turn-o { color: var(--o-color); border: 1px solid var(--o-color); }
 
+        /* Board Wrapper (Hỗ trợ cuộn trên mobile để ô không bị nhỏ) */
+        .board-scroll-wrapper {
+            width: 100%;
+            max-width: 100vw;
+            overflow: auto;
+            display: flex;
+            justify-content: center;
+            padding: 5px;
+        }
+
+        /* Tùy chỉnh thanh cuộn đẹp hơn */
+        .board-scroll-wrapper::-webkit-scrollbar {
+            height: 8px;
+            width: 8px;
+        }
+        .board-scroll-wrapper::-webkit-scrollbar-track {
+            background: var(--board-bg);
+            border-radius: 4px;
+        }
+        .board-scroll-wrapper::-webkit-scrollbar-thumb {
+            background: var(--last-move-bg);
+            border-radius: 4px;
+        }
+
         /* Board Styling */
         .board-container {
             width: 100%;
             max-width: 600px;
-            aspect-ratio: 1 / 1; /* Giữ bảng luôn hình vuông */
+            min-width: 500px; /* Bắt buộc tối thiểu 500px để các ô đủ to dễ bấm */
+            aspect-ratio: 1 / 1; 
             background-color: var(--cell-border);
             border: 4px solid var(--board-bg);
             border-radius: 8px;
@@ -126,10 +154,9 @@
             display: grid;
             width: 100%;
             height: 100%;
-            /* Mặc định 15x15. Sẽ set bằng JS */
             grid-template-columns: repeat(15, 1fr);
             grid-template-rows: repeat(15, 1fr);
-            gap: 1px; /* Tạo đường kẻ */
+            gap: 1px;
             background-color: var(--cell-border);
         }
 
@@ -138,21 +165,13 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: calc(100vw / 22); /* Chữ tự co giãn theo màn hình */
+            font-size: 26px; /* Cố định kích thước chữ to rõ */
             font-weight: bold;
             cursor: pointer;
             transition: background-color 0.2s, transform 0.1s;
         }
 
-        @media (min-width: 600px) {
-            .cell {
-                font-size: 28px; /* Cố định font trên màn PC */
-            }
-        }
-
-        .cell:hover {
-            background-color: var(--cell-bg);
-        }
+        .cell:hover { background-color: var(--cell-bg); }
 
         .cell.x {
             color: var(--x-color);
@@ -199,12 +218,7 @@
             transition: opacity 0.3s;
             z-index: 100;
         }
-
-        .modal-overlay.active {
-            opacity: 1;
-            pointer-events: all;
-        }
-
+        .modal-overlay.active { opacity: 1; pointer-events: all; }
         .modal-content {
             background: var(--board-bg);
             padding: 30px 40px;
@@ -214,16 +228,8 @@
             transition: transform 0.3s;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
-
-        .modal-overlay.active .modal-content {
-            transform: translateY(0);
-        }
-
-        .modal-title {
-            font-size: 2rem;
-            margin-bottom: 20px;
-        }
-
+        .modal-overlay.active .modal-content { transform: translateY(0); }
+        .modal-title { font-size: 2rem; margin-bottom: 20px; }
         .modal-btn {
             background: var(--primary-color);
             color: white;
@@ -233,13 +239,14 @@
             border-radius: 8px;
             cursor: pointer;
             font-weight: bold;
+            margin: 5px;
         }
     </style>
 </head>
 <body>
 
     <header>
-        <h1>Cờ Caro </h1>
+        <h1>Cờ Caro</h1>
         <div class="controls">
             <div class="select-group">
                 <select id="gameMode">
@@ -247,7 +254,9 @@
                     <option value="pvp">Người vs Người</option>
                 </select>
             </div>
-            <button class="btn-reset" onclick="initGame()">Chơi Lại</button>
+            <button class="btn-action" onclick="undoMove()">↩️ Đi lại</button>
+            <button class="btn-action" id="btnFullscreen" onclick="toggleFullScreen()">🔲 Toàn màn hình</button>
+            <button class="btn-action btn-reset" onclick="initGame()">🔄 Ván Mới</button>
         </div>
         <div class="status-bar">
             <span>Lượt đánh: </span>
@@ -255,14 +264,17 @@
         </div>
     </header>
 
-    <div class="board-container">
-        <div class="board" id="board"></div>
+    <div class="board-scroll-wrapper">
+        <div class="board-container">
+            <div class="board" id="board"></div>
+        </div>
     </div>
 
     <!-- Modal thông báo người thắng -->
     <div class="modal-overlay" id="modalOverlay">
         <div class="modal-content">
             <h2 class="modal-title" id="modalMessage">X Chiến Thắng!</h2>
+            <button class="modal-btn" onclick="undoMove()">↩️ Đi Lại</button>
             <button class="modal-btn" onclick="closeModalAndReset()">Chơi Ván Mới</button>
         </div>
     </div>
@@ -276,7 +288,8 @@
         const modalMessage = document.getElementById('modalMessage');
 
         let board = [];
-        let currentPlayer = 'X'; // X đi trước
+        let moveHistory = []; // Lưu trữ lịch sử nước đi
+        let currentPlayer = 'X'; 
         let gameActive = true;
         let lastMoveElement = null;
         let isAiThinking = false;
@@ -292,12 +305,14 @@
             boardElement.style.gridTemplateRows = `repeat(${BOARD_SIZE}, 1fr)`;
             
             board = [];
+            moveHistory = [];
+            
             for (let i = 0; i < BOARD_SIZE; i++) {
                 let row = [];
                 for (let j = 0; j < BOARD_SIZE; j++) {
                     row.push('');
                     const cell = document.createElement('div');
-                    cell.classList.add('cell');
+                    cell.className = 'cell';
                     cell.dataset.row = i;
                     cell.dataset.col = j;
                     cell.addEventListener('click', handleCellClick);
@@ -310,6 +325,7 @@
             gameActive = true;
             lastMoveElement = null;
             isAiThinking = false;
+            modalOverlay.classList.remove('active');
             updateTurnIndicator();
         }
 
@@ -341,12 +357,17 @@
             cell.textContent = player;
             cell.classList.add(player.toLowerCase());
 
-            // Xử lý hiệu ứng "Ô vừa đánh" (Hủy ô cũ, sáng ô mới)
+            // Xóa highlight của nước đi cũ
             if (lastMoveElement) {
                 lastMoveElement.classList.remove('last-move');
             }
+            
+            // Highlight ô mới nhất
             cell.classList.add('last-move');
             lastMoveElement = cell;
+
+            // Lưu vào lịch sử (dùng cho tính năng Undo)
+            moveHistory.push({ row, col, player, element: cell });
 
             // Kiểm tra thắng thua
             const winCells = checkWin(row, col, player);
@@ -369,12 +390,89 @@
             updateTurnIndicator();
         }
 
-        // Lấy element từ tọa độ
+        // --- TÍNH NĂNG ĐI LẠI (UNDO) ---
+        function undoMove() {
+            if (moveHistory.length === 0 || isAiThinking) return;
+
+            if (modeSelect.value === 'pvp') {
+                // PvP: Rút 1 nước cờ
+                const lastMove = moveHistory.pop();
+                revertCell(lastMove);
+                currentPlayer = lastMove.player;
+            } else {
+                // PvE: Rút cờ cho tới khi lấy lại được lượt của Người chơi (X)
+                while (moveHistory.length > 0) {
+                    const lastMove = moveHistory.pop();
+                    revertCell(lastMove);
+                    if (lastMove.player === 'X') {
+                        currentPlayer = 'X';
+                        break;
+                    }
+                }
+            }
+
+            // Nếu undo khi đã có người thắng, khôi phục lại trạng thái game
+            if (!gameActive) {
+                gameActive = true;
+                modalOverlay.classList.remove('active');
+                // Xóa viền nhấp nháy chiến thắng
+                document.querySelectorAll('.win-cell').forEach(el => el.classList.remove('win-cell'));
+            }
+
+            // Phục hồi hiệu ứng sáng cho ô đánh trước đó (nếu còn)
+            if (moveHistory.length > 0) {
+                const prevMove = moveHistory[moveHistory.length - 1];
+                prevMove.element.classList.add('last-move');
+                lastMoveElement = prevMove.element;
+            } else {
+                lastMoveElement = null;
+            }
+
+            updateTurnIndicator();
+        }
+
+        function revertCell(move) {
+            board[move.row][move.col] = '';
+            move.element.textContent = '';
+            move.element.className = 'cell'; // Xóa sạch các class X, O, win-cell, last-move
+        }
+
+        // --- TÍNH NĂNG FULLSCREEN ---
+        function toggleFullScreen() {
+            const doc = window.document;
+            const docEl = doc.documentElement;
+
+            const requestFullScreen = docEl.requestFullscreen || docEl.mozRequestFullScreen || docEl.webkitRequestFullScreen || docEl.msRequestFullscreen;
+            const cancelFullScreen = doc.exitFullscreen || doc.mozCancelFullScreen || doc.webkitExitFullscreen || doc.msExitFullscreen;
+
+            if (!doc.fullscreenElement && !doc.mozFullScreenElement && !doc.webkitFullscreenElement && !doc.msFullscreenElement) {
+                requestFullScreen.call(docEl).catch(err => {
+                    alert(`Không thể mở toàn màn hình: ${err.message}`);
+                });
+            } else {
+                cancelFullScreen.call(doc);
+            }
+        }
+
+        // Cập nhật text nút Fullscreen khi trạng thái màn hình thay đổi
+        document.addEventListener('fullscreenchange', updateFsButton);
+        document.addEventListener('webkitfullscreenchange', updateFsButton);
+        document.addEventListener('mozfullscreenchange', updateFsButton);
+
+        function updateFsButton() {
+            const btn = document.getElementById('btnFullscreen');
+            if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement) {
+                btn.innerHTML = '📴 Thu nhỏ';
+            } else {
+                btn.innerHTML = '🔲 Toàn màn hình';
+            }
+        }
+
+        // --- CÁC HÀM TIỆN ÍCH ---
         function getCellElement(row, col) {
             return boardElement.querySelector(`[data-row="${row}"][data-col="${col}"]`);
         }
 
-        // Cập nhật text hiển thị lượt
         function updateTurnIndicator(customText = null) {
             turnIndicator.className = `turn-indicator turn-${currentPlayer.toLowerCase()}`;
             if (customText) {
@@ -386,12 +484,13 @@
             }
         }
 
-        // --- Logic AI (Máy đánh) ---
+        // --- Logic AI ---
         function makeAiMove() {
+            if(!gameActive) { isAiThinking = false; return; }
+
             let bestScore = -Infinity;
             let bestMove = { row: -1, col: -1 };
             
-            // Lặp qua toàn bộ bàn cờ để chấm điểm
             for (let r = 0; r < BOARD_SIZE; r++) {
                 for (let c = 0; c < BOARD_SIZE; c++) {
                     if (board[r][c] === '') {
@@ -404,8 +503,7 @@
                 }
             }
 
-            // Đánh vào ô có điểm cao nhất
-            // Nếu bàn cờ trống hoàn toàn, đánh vào giữa
+            // Đánh vào giữa nếu bàn cờ trống
             if (bestMove.row === -1) {
                 bestMove = { row: Math.floor(BOARD_SIZE/2), col: Math.floor(BOARD_SIZE/2) };
             }
@@ -414,48 +512,35 @@
             isAiThinking = false;
         }
 
-        // Hàm chấm điểm 1 ô trống cho AI
         function evaluateCell(row, col) {
             let totalScore = 0;
-            const directions = [
-                [0, 1], [1, 0], [1, 1], [1, -1] // Ngang, dọc, chéo chính, chéo phụ
-            ];
+            const directions = [ [0, 1], [1, 0], [1, 1], [1, -1] ];
 
             directions.forEach(dir => {
-                let attack = evaluateDirection(row, col, dir[0], dir[1], 'O'); // Điểm tấn công
-                let defense = evaluateDirection(row, col, dir[0], dir[1], 'X'); // Điểm chặn người chơi
+                let attack = evaluateDirection(row, col, dir[0], dir[1], 'O');
+                let defense = evaluateDirection(row, col, dir[0], dir[1], 'X');
                 
-                // AI Gomoku: Phòng thủ thường quan trọng bằng hoặc hơn tấn công để sống sót
                 totalScore += attackScores[attack.count] + defenseScores[defense.count];
 
-                // Thưởng điểm nếu cờ mở 2 đầu
                 if (attack.openEnds === 2) totalScore += attackScores[attack.count] * 0.5;
                 if (defense.openEnds === 2) totalScore += defenseScores[defense.count] * 0.5;
             });
-
             return totalScore;
         }
 
-        // Đếm số cờ liên tiếp và độ mở của 1 hướng
         function evaluateDirection(row, col, dRow, dCol, player) {
             let count = 0;
             let openEnds = 0;
 
-            // Kiểm tra chiều tiến
             let r = row + dRow, c = col + dCol;
             while (r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE && board[r][c] === player) {
-                count++;
-                r += dRow;
-                c += dCol;
+                count++; r += dRow; c += dCol;
             }
             if (r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE && board[r][c] === '') openEnds++;
 
-            // Kiểm tra chiều lùi
             r = row - dRow; c = col - dCol;
             while (r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE && board[r][c] === player) {
-                count++;
-                r -= dRow;
-                c -= dCol;
+                count++; r -= dRow; c -= dCol;
             }
             if (r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE && board[r][c] === '') openEnds++;
 
@@ -465,10 +550,7 @@
         // --- Logic Kiểm tra Thắng ---
         function checkWin(row, col, player) {
             const directions = [
-                [[0, 1], [0, -1]], // Ngang
-                [[1, 0], [-1, 0]], // Dọc
-                [[1, 1], [-1, -1]],// Chéo \
-                [[1, -1], [-1, 1]] // Chéo /
+                [[0, 1], [0, -1]], [[1, 0], [-1, 0]], [[1, 1], [-1, -1]], [[1, -1], [-1, 1]]
             ];
 
             for (let dir of directions) {
@@ -476,24 +558,18 @@
                 let winCells = [{row, col}];
 
                 for (let d of dir) {
-                    let r = row + d[0];
-                    let c = col + d[1];
+                    let r = row + d[0]; let c = col + d[1];
                     while (r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE && board[r][c] === player) {
                         count++;
                         winCells.push({row: r, col: c});
-                        r += d[0];
-                        c += d[1];
+                        r += d[0]; c += d[1];
                     }
                 }
-
-                if (count >= 5) {
-                    return winCells; // Trả về mảng các ô thắng
-                }
+                if (count >= 5) return winCells; 
             }
             return null;
         }
 
-        // Tô màu các ô chiến thắng
         function highlightWinCells(cells) {
             cells.forEach(pos => {
                 const cell = getCellElement(pos.row, pos.col);
@@ -501,7 +577,6 @@
             });
         }
 
-        // Kiểm tra hòa (đầy bàn cờ)
         function checkDraw() {
             for (let i = 0; i < BOARD_SIZE; i++) {
                 for (let j = 0; j < BOARD_SIZE; j++) {
@@ -511,13 +586,10 @@
             return true;
         }
 
-        // --- Xử lý Giao diện ---
+        // --- Xử lý Giao diện & Sự kiện ---
         function showModal(message) {
             modalMessage.textContent = message;
-            // Delay hiện modal một chút để người chơi thấy rõ đường cờ thắng
-            setTimeout(() => {
-                modalOverlay.classList.add('active');
-            }, 500);
+            setTimeout(() => { modalOverlay.classList.add('active'); }, 500);
         }
 
         function closeModalAndReset() {
@@ -525,12 +597,10 @@
             initGame();
         }
 
-        // Lắng nghe thay đổi chế độ chơi để reset game
         modeSelect.addEventListener('change', initGame);
-
-        // Khởi động game lần đầu
+        
+        // Khởi động
         initGame();
-
     </script>
 </body>
 </html>
