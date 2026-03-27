@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cờ Caro Cao Cấp</title>
+    <title>Cờ Caro By nguyễn Hải Huy</title>
     <style>
         :root {
             --bg-color: #0f172a;
@@ -16,7 +16,6 @@
             --last-move-bg: #475569;
             --win-bg: #fbbf24;
             --primary-color: #10b981;
-            --cheat-color: #8b5cf6;
         }
 
         * {
@@ -70,31 +69,6 @@
             margin-bottom: 10px;
         }
 
-        .cheat-area {
-            display: none; 
-            flex-direction: column;
-            gap: 8px;
-            border: 1px solid var(--cheat-color);
-            width: 100%;
-        }
-
-        .cheat-input-group {
-            display: flex;
-            gap: 5px;
-            justify-content: center;
-        }
-
-        .cheat-input-group input {
-            padding: 8px;
-            border-radius: 6px;
-            border: none;
-            outline: none;
-            background: #cbd5e1;
-            color: #0f172a;
-            font-weight: bold;
-            width: 150px;
-        }
-
         .select-group select, .btn-action {
             background: var(--cell-bg);
             color: var(--text-color);
@@ -114,9 +88,6 @@
 
         .btn-reset { background: var(--primary-color) !important; color: white !important; }
         .btn-reset:hover { background: #059669 !important; }
-        
-        .btn-cheat { background: var(--cheat-color) !important; color: white !important; }
-        .btn-cheat:hover { background: #7c3aed !important; }
 
         .status-bar {
             font-size: 1.2rem;
@@ -129,7 +100,7 @@
         }
 
         .turn-indicator {
-            padding: 4px 12px;
+            padding: 4px 15px;
             border-radius: 20px;
             background: var(--board-bg);
             transition: 0.3s;
@@ -137,7 +108,7 @@
 
         .turn-x { color: var(--x-color); border: 1px solid var(--x-color); }
         .turn-o { color: var(--o-color); border: 1px solid var(--o-color); }
-        .turn-ai { color: var(--cheat-color); border: 1px solid var(--cheat-color); box-shadow: 0 0 10px var(--cheat-color); }
+        .turn-ai { color: #f59e0b; border: 1px solid #f59e0b; box-shadow: 0 0 10px rgba(245, 158, 11, 0.5); }
 
         .board-scroll-wrapper {
             width: 100%;
@@ -258,31 +229,20 @@
         <div class="controls">
             <div class="select-group">
                 <select id="gameMode">
-                    <option value="pve-easy">Máy -  Dễ</option>
-                    <option value="pve-medium">Máy -  Vừa</option>
-                    <option value="pve-hard">Máy - Khó</option>
-                    <option value="pve-super" selected> Máy - Siêu Khó</option>
+                    <option value="pve-easy">Máy - Mức Dễ</option>
+                    <option value="pve-medium">Máy - Mức Vừa</option>
+                    <option value="pve-hard">Máy - Mức Khó</option>
+                    <option value="pve-super" selected>Máy - Siêu Khó</option>
                     <option value="pvp">2 Người </option>
                 </select>
             </div>
             <button class="btn-action" onclick="undoMove()">↩️ Đi lại</button>
-            <button class="btn-action" onclick="enterFullScreen()">🔲 Mở Toàn màn hình</button>
+            <button class="btn-action" onclick="enterFullScreen()">🔲 Toàn màn hình</button>
             <button class="btn-action btn-reset" onclick="initGame()">🔄 Ván Mới</button>
         </div>
 
-        <div class="controls cheat-area" id="cheatArea">
-            <div style="font-size: 0.9rem; color: #cbd5e1;">Cửa Hàng Hỗ Trợ (Nhập Mật Mã)</div>
-            <div class="cheat-input-group">
-                <input type="password" id="cheatPass" placeholder="Mật mã bí mật...">
-                <button class="btn-action btn-cheat" onclick="unlockCheat()">🔓 Mở khóa</button>
-            </div>
-            <button id="btnAiAssist" class="btn-action btn-cheat" style="display: none; width: 100%; margin-top: 5px;" onclick="useAiAssist()">Máy đánh giúp</button>
-            <div id="cheatStatus" style="font-size: 0.85rem; color: var(--win-bg); margin-top: 5px;"></div>
-        </div>
-
         <div class="status-bar">
-            <span>Lượt đánh: </span>
-            <span id="turnIndicator" class="turn-indicator turn-x">Người chơi X</span>
+            <span id="turnIndicator" class="turn-indicator turn-x">Lượt của: Bạn (X)</span>
         </div>
     </header>
 
@@ -309,9 +269,6 @@
         const modeSelect = document.getElementById('gameMode');
         const modalOverlay = document.getElementById('modalOverlay');
         const modalMessage = document.getElementById('modalMessage');
-        const cheatArea = document.getElementById('cheatArea');
-        const btnAiAssist = document.getElementById('btnAiAssist');
-        const cheatStatus = document.getElementById('cheatStatus');
 
         let board = [];
         let moveHistory = []; 
@@ -320,15 +277,11 @@
         let lastMoveElement = null;
         let isAiThinking = false;
 
-        let unlockedX = false;
-        let unlockedO = false;
-        const SECRET_PASS = "200529";
-
-        // BẢNG ĐIỂM HEURISTIC GOMOKU (Chuẩn không thể sai)
+        // BẢNG ĐIỂM HEURISTIC GOMOKU
         const WIN_SCORE = 100000000;
         const OPEN4_SCORE = 10000000;
         const CLOSED4_SCORE = 1000000;
-        const OPEN3_SCORE = 100000;
+        const OPEN3_SCORE = 500000; // Open 3 cực kỳ nguy hiểm
         const CLOSED3_SCORE = 10000;
         const OPEN2_SCORE = 1000;
         const CLOSED2_SCORE = 100;
@@ -362,59 +315,26 @@
             lastMoveElement = null;
             isAiThinking = false;
             
-            unlockedX = false;
-            unlockedO = false;
-            document.getElementById('cheatPass').value = '';
-
             modalOverlay.classList.remove('active');
             updateUIState();
         }
 
-        // --- MỞ KHÓA BÍ MẬT ---
-        function unlockCheat() {
-            const inputPass = document.getElementById('cheatPass').value;
-            if (inputPass === SECRET_PASS) {
-                if (currentPlayer === 'X') unlockedX = true;
-                if (currentPlayer === 'O') unlockedO = true;
-                
-                document.getElementById('cheatPass').value = '';
-                updateUIState();
-                
-                document.body.style.backgroundColor = 'white';
-                setTimeout(() => document.body.style.backgroundColor = '', 100);
-            } else {
-                alert("Mật mã không đúng!");
-            }
-        }
-
+        // --- CẬP NHẬT GIAO DIỆN LƯỢT ĐI ---
         function updateUIState() {
             if (isAiThinking) {
                 turnIndicator.className = 'turn-indicator turn-ai';
-                turnIndicator.textContent = "🧠 AI đang suy nghĩ...";
+                turnIndicator.textContent = "💻 Máy đang suy nghĩ...";
             } else {
                 turnIndicator.className = `turn-indicator turn-${currentPlayer.toLowerCase()}`;
-                let name = currentPlayer === 'X' ? 'Người chơi X' : 'Người chơi O';
-                if (modeSelect.value.startsWith('pve') && currentPlayer === 'O') name = 'Máy (AI)';
-                turnIndicator.textContent = `Lượt của: ${name}`;
-            }
-
-            if (modeSelect.value === 'pvp') {
-                cheatArea.style.display = 'flex';
-                let unlockedBy = [];
-                if (unlockedX) unlockedBy.push("Người chơi X");
-                if (unlockedO) unlockedBy.push("Người chơi O");
-                
-                cheatStatus.textContent = unlockedBy.length > 0 
-                    ? `[Đã mở khóa đặc quyền cho: ${unlockedBy.join(', ')}]` 
-                    : "";
-
-                if (!isAiThinking && ((currentPlayer === 'X' && unlockedX) || (currentPlayer === 'O' && unlockedO))) {
-                    btnAiAssist.style.display = 'block';
+                if (modeSelect.value === 'pvp') {
+                    turnIndicator.textContent = `Lượt của: Người chơi ${currentPlayer}`;
                 } else {
-                    btnAiAssist.style.display = 'none';
+                    if (currentPlayer === 'O') {
+                        turnIndicator.textContent = `Lượt của: Máy (O)`;
+                    } else {
+                        turnIndicator.textContent = `Lượt của: Bạn (X)`;
+                    }
                 }
-            } else {
-                cheatArea.style.display = 'none';
             }
         }
 
@@ -423,18 +343,20 @@
             if (!gameActive || isAiThinking) return;
             const row = parseInt(e.target.dataset.row);
             const col = parseInt(e.target.dataset.col);
-            if (board[row][col] !== '') return;
+            if (board[row][col] !== '') return; // Đảm bảo không đánh đè lên ô đã có
 
             makeMove(row, col, currentPlayer);
 
             if (!gameActive) return;
 
+            // Nếu là chế độ PvE và đến lượt O
             if (modeSelect.value.startsWith('pve') && currentPlayer === 'O') {
                 isAiThinking = true;
                 updateUIState();
                 
                 let difficulty = modeSelect.value.split('-')[1];
-                setTimeout(() => executeAiMoveLocal('O', difficulty), 150); 
+                // Thêm độ trễ để tạo cảm giác AI đang suy nghĩ
+                setTimeout(() => executeAiMoveLocal('O', difficulty), 300); 
             }
         }
 
@@ -453,7 +375,10 @@
             const winCells = checkWin(row, col, player);
             if (winCells) {
                 highlightWinCells(winCells);
-                let winnerName = player === 'X' ? 'Người chơi X' : (modeSelect.value.startsWith('pve') ? 'Máy (AI)' : 'Người chơi O');
+                let winnerName = player === 'X' ? 'Người chơi X' : 'Người chơi O';
+                if (modeSelect.value !== 'pvp') {
+                    winnerName = player === 'X' ? 'Bạn' : 'Máy (AI)';
+                }
                 showModal(`${winnerName} Chiến Thắng!`);
                 gameActive = false;
                 updateUIState();
@@ -471,15 +396,7 @@
             updateUIState();
         }
 
-        function useAiAssist() {
-            if (!gameActive || isAiThinking) return;
-            isAiThinking = true;
-            updateUIState();
-            // Cheat mode luôn dùng mức Siêu Khó (super)
-            setTimeout(() => executeAiMoveLocal(currentPlayer, 'super'), 150);
-        }
-
-        // --- HỆ THỐNG AI (ĐẢM BẢO CHẶT CHẼ) ---
+        // --- HỆ THỐNG AI TỐI ƯU ---
         function patternToScore(count, blocks) {
             if (count >= 5) return WIN_SCORE;
             if (count === 4) return blocks === 0 ? OPEN4_SCORE : CLOSED4_SCORE;
@@ -492,23 +409,43 @@
         function getLinePattern(row, col, dRow, dCol, player) {
             let count = 1; 
             let blocks = 0;
+            let space1 = 0;
+            let space2 = 0;
 
+            // Chiều tiến
             let r = row + dRow, c = col + dCol;
             while (r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE && board[r][c] === player) {
                 count++; r += dRow; c += dCol;
             }
-            if (r < 0 || r >= BOARD_SIZE || c < 0 || c >= BOARD_SIZE || board[r][c] !== '') blocks++;
+            if (r < 0 || r >= BOARD_SIZE || c < 0 || c >= BOARD_SIZE || board[r][c] !== '') {
+                blocks++;
+            } else {
+                let tr = r, tc = c;
+                while (tr >= 0 && tr < BOARD_SIZE && tc >= 0 && tc < BOARD_SIZE && board[tr][tc] === '') {
+                    space1++; tr += dRow; tc += dCol;
+                }
+            }
 
+            // Chiều lùi
             r = row - dRow; c = col - dCol;
             while (r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE && board[r][c] === player) {
                 count++; r -= dRow; c -= dCol;
             }
-            if (r < 0 || r >= BOARD_SIZE || c < 0 || c >= BOARD_SIZE || board[r][c] !== '') blocks++;
+            if (r < 0 || r >= BOARD_SIZE || c < 0 || c >= BOARD_SIZE || board[r][c] !== '') {
+                blocks++;
+            } else {
+                let tr = r, tc = c;
+                while (tr >= 0 && tr < BOARD_SIZE && tc >= 0 && tc < BOARD_SIZE && board[tr][tc] === '') {
+                    space2++; tr -= dRow; tc -= dCol;
+                }
+            }
+
+            // Lọc đường chết: Nếu tổng số ô trống xung quanh và số quân cờ đang có không đủ 5 ô, vô ích
+            if (count + space1 + space2 < 5) return { count: 0, blocks: 2 };
 
             return { count, blocks };
         }
 
-        // Tính điểm cho 1 ô dựa trên tiềm năng tấn công và phòng thủ
         function getCellScore(row, col, mySide, oppSide) {
             let attackScore = 0;
             let defenseScore = 0;
@@ -521,11 +458,10 @@
                 attackScore += patternToScore(attack.count, attack.blocks);
                 defenseScore += patternToScore(defense.count, defense.blocks);
             }
-            // Trong Caro, chặn đối thủ có giá trị tương đương hoặc cao hơn việc tự xây 
-            return attackScore + (defenseScore * 1.1); 
+            // Ưu tiên chặn địch hơn là xây nhà (Chống chết đột ngột)
+            return attackScore + (defenseScore * 1.5); 
         }
 
-        // Tối ưu hóa: Chỉ lấy các ô trống xung quanh quân cờ đã đánh
         function getCandidates() {
             let candidates = [];
             let hasPiece = false;
@@ -535,6 +471,7 @@
                 for (let c = 0; c < BOARD_SIZE; c++) {
                     if (board[r][c] !== '') {
                         hasPiece = true;
+                        // Chỉ xét các ô trống trong bán kính 2 ô quanh quân cờ đã đánh
                         for (let i = -2; i <= 2; i++) {
                             for (let j = -2; j <= 2; j++) {
                                 let nr = r + i, nc = c + j;
@@ -550,32 +487,29 @@
                     }
                 }
             }
-            // Nếu bàn cờ trống, đánh vào giữa
             return hasPiece ? candidates : [{r: Math.floor(BOARD_SIZE/2), c: Math.floor(BOARD_SIZE/2)}];
         }
 
-        // Kiểm tra nước đi Bắt Buộc (Thắng luôn hoặc Chặn thua ngay lập tức)
+        // Bắt buộc thắng hoặc chặn thua
         function getForcedMove(aiSide, oppSide) {
             let candidates = getCandidates();
             let oppWinMove = null;
 
             for (let move of candidates) {
                 let {r, c} = move;
-                // 1. Nếu AI thắng ngay -> Đánh luôn không cần nghĩ
+                
                 board[r][c] = aiSide;
                 if (checkWin(r, c, aiSide)) { board[r][c] = ''; return move; }
                 board[r][c] = '';
 
-                // 2. Nếu đối thủ sắp thắng -> Ghi nhớ để chặn
                 board[r][c] = oppSide;
                 if (checkWin(r, c, oppSide)) { oppWinMove = move; }
                 board[r][c] = '';
             }
-            if (oppWinMove) return oppWinMove; // Trả về nước chặn bắt buộc
+            if (oppWinMove) return oppWinMove; 
             return null;
         }
 
-        // Logic chính của AI tùy theo Độ Khó
         function executeAiMoveLocal(aiSide, difficulty) {
             if(!gameActive) { isAiThinking = false; return; }
 
@@ -583,78 +517,66 @@
             let bestMove = { r: -1, c: -1 };
             let candidates = getCandidates();
 
-            if (candidates.length === 1 && candidates[0].r === 7) { 
+            // Nếu máy đi nước đầu tiên (chỉ có 1 candidate ở giữa)
+            if (candidates.length === 1 && candidates[0].r === Math.floor(BOARD_SIZE/2)) { 
                 makeMove(candidates[0].r, candidates[0].c, aiSide);
                 isAiThinking = false;
                 return;
             }
 
-            // LEVEL 1: DỄ - Thỉnh thoảng đánh ngẫu nhiên
+            // Luôn kiểm tra Nước đi bắt buộc trước (Để không bỏ lỡ chiến thắng hoặc bị thua nhảm)
+            let forced = getForcedMove(aiSide, oppSide);
+            if (forced) {
+                makeMove(forced.r, forced.c, aiSide);
+                isAiThinking = false;
+                return;
+            }
+
+            // Chấm điểm tất cả các ô
+            candidates.forEach(m => { m.score = getCellScore(m.r, m.c, aiSide, oppSide); });
+            candidates.sort((a, b) => b.score - a.score);
+
             if (difficulty === 'easy') {
-                candidates.forEach(m => { m.score = getCellScore(m.r, m.c, aiSide, oppSide); });
-                candidates.sort((a, b) => b.score - a.score);
-                let pool = candidates.slice(0, Math.min(6, candidates.length));
+                // Dễ: Chọn ngẫu nhiên trong 8 nước tốt nhất
+                let pool = candidates.slice(0, Math.min(8, candidates.length));
                 bestMove = pool[Math.floor(Math.random() * pool.length)];
             } 
-            // LEVEL 2: VỪA - Heuristic cơ bản (Greedy), dễ sập bẫy chéo
             else if (difficulty === 'medium') {
-                let bestScore = -Infinity;
-                for(let move of candidates) {
-                    let score = getCellScore(move.r, move.c, aiSide, oppSide);
-                    if (score > bestScore) { bestScore = score; bestMove = move; }
-                }
+                // Vừa: Chọn ngẫu nhiên trong 3 nước tốt nhất
+                let pool = candidates.slice(0, Math.min(3, candidates.length));
+                bestMove = pool[Math.floor(Math.random() * pool.length)];
             }
-            // LEVEL 3: KHÓ - Greedy chặt chẽ + Kiểm tra bẫy trực tiếp
             else if (difficulty === 'hard') {
-                let forced = getForcedMove(aiSide, oppSide);
-                if (forced) { bestMove = forced; }
-                else {
-                    let bestScore = -Infinity;
-                    for(let move of candidates) {
-                        let score = getCellScore(move.r, move.c, aiSide, oppSide);
-                        if (score > bestScore) { bestScore = score; bestMove = move; }
-                    }
-                }
+                // Khó: Đánh chính xác nước tốt nhất hiện hành (Greedy)
+                bestMove = candidates[0];
             }
-            // LEVEL 4: SIÊU KHÓ - Minimax Nhìn Trực Diện (Đọc trước 1 nước của đối thủ để phá bẫy)
             else { 
-                let forced = getForcedMove(aiSide, oppSide);
-                if (forced) { 
-                    bestMove = forced; 
-                } else {
-                    // Chấm điểm lần 1 để lọc ra Top 15 nước đi tốt nhất
-                    candidates.forEach(m => { m.score = getCellScore(m.r, m.c, aiSide, oppSide); });
-                    candidates.sort((a, b) => b.score - a.score);
-                    let topMoves = candidates.slice(0, 15);
+                // SIÊU KHÓ: Minimax Depth 1 (Đọc trước 1 nước chống lại đường sống của đối thủ)
+                let topMoves = candidates.slice(0, Math.min(10, candidates.length));
+                let bestSuperScore = -Infinity;
+                bestMove = topMoves[0]; // Fallback
 
-                    let bestScore = -Infinity;
+                for (let move of topMoves) {
+                    board[move.r][move.c] = aiSide; // Đánh thử
+                    
+                    let oppCandidates = getCandidates();
+                    let maxOppScore = -Infinity;
+                    
+                    // Đo lường phản kháng mạnh nhất của địch
+                    for (let oppMove of oppCandidates) {
+                        let oppScore = getCellScore(oppMove.r, oppMove.c, oppSide, aiSide);
+                        if (oppScore > maxOppScore) maxOppScore = oppScore;
+                        if (oppScore >= WIN_SCORE) break; // Cắt tỉa (Pruning) nếu thấy cửa tử
+                    }
+                    
+                    board[move.r][move.c] = ''; // Hoàn lại
+                    
+                    // Điểm cuối = Lợi thế của mình - (Mối đe dọa từ địch * 1.2)
+                    let finalScore = move.score - (maxOppScore * 1.2);
 
-                    // Giả lập từng nước đi của AI
-                    for (let move of topMoves) {
-                        board[move.r][move.c] = aiSide;
-                        
-                        // Tìm nước đáp trả đau nhất của Đối thủ
-                        let oppCandidates = getCandidates();
-                        let maxOppScore = -Infinity;
-                        
-                        for (let oppMove of oppCandidates) {
-                            let oppScore = getCellScore(oppMove.r, oppMove.c, oppSide, aiSide);
-                            if (oppScore > maxOppScore) {
-                                maxOppScore = oppScore;
-                            }
-                            // Pruning: Nếu đối thủ có nước thắng thì không cần xét tiếp các nước khác
-                            if (oppScore >= WIN_SCORE) break; 
-                        }
-                        
-                        board[move.r][move.c] = '';
-                        
-                        // Điểm cuối cùng = Điểm lợi thế của AI - Điểm đe dọa lớn nhất của Đối thủ sau đó
-                        let score = move.score - maxOppScore;
-
-                        if (score > bestScore) {
-                            bestScore = score;
-                            bestMove = move;
-                        }
+                    if (finalScore > bestSuperScore) {
+                        bestSuperScore = finalScore;
+                        bestMove = move;
                     }
                 }
             }
@@ -766,5 +688,3 @@
     </script>
 </body>
 </html>
-
-
