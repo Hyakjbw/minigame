@@ -2,916 +2,536 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Arcade VN Super Lite</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cờ Caro</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Nunito:wght@400;700;900&display=swap');
-
-        /* --- CORE SYSTEM STYLES --- */
         :root {
-            --bg-color: #111827;
-            --accent-color: #3b82f6;
-            --panel-bg: #1f2937;
-            --grid-line: #374151;
+            --bg-color: #0f172a;
+            --board-bg: #1e293b;
+            --cell-bg: #334155;
+            --cell-border: #0f172a;
+            --text-color: #f8fafc;
+            --x-color: #ef4444; /* Đỏ/Hồng cho X */
+            --o-color: #0ea5e9; /* Xanh dương cho O */
+            --last-move-bg: #475569;
+            --win-bg: #fbbf24;
+            --primary-color: #10b981;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body {
             background-color: var(--bg-color);
-            color: white;
-            font-family: 'Nunito', sans-serif;
-            overflow: hidden; /* Chặn cuộn trang */
-            touch-action: none; /* Chặn zoom/pan mặc định */
-            height: 100dvh; /* Chiều cao thực tế trên mobile */
-            width: 100vw;
+            color: var(--text-color);
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             display: flex;
             flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 10px;
+            touch-action: manipulation; /* Ngăn zoom khi double tap trên mobile */
         }
 
-        /* --- UTILITIES --- */
-        .retro-text { font-family: 'Press Start 2P', cursive; }
-        .no-select { user-select: none; -webkit-user-select: none; }
-        
-        /* Hiệu ứng bấm nút */
-        .btn-press:active { transform: scale(0.95); opacity: 0.8; }
-
-        /* --- MENU GRID --- */
-        #menu-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 1rem;
-            padding: 1rem;
+        header {
+            text-align: center;
+            margin-bottom: 15px;
             width: 100%;
             max-width: 600px;
-            margin: 0 auto;
-            overflow-y: auto;
         }
-        
-        .game-card {
-            background: linear-gradient(145deg, #1f2937, #111827);
-            border: 2px solid #374151;
-            border-radius: 1rem;
-            aspect-ratio: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
-            transition: all 0.2s;
-        }
-        .game-card:active { border-color: var(--accent-color); transform: scale(0.98); }
 
-        /* --- GAME CONTAINER LAYOUT --- */
-        /* Đây là phần quan trọng nhất để fix lỗi giao diện */
-        #game-wrapper {
-            flex: 1;
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            background: -webkit-linear-gradient(45deg, var(--primary-color), var(--o-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .controls {
             display: flex;
-            flex-direction: column;
+            justify-content: space-between;
             align-items: center;
-            justify-content: flex-start; /* Để chừa chỗ cho controls ở dưới */
-            position: relative;
+            background: var(--board-bg);
+            padding: 10px 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+            margin-bottom: 15px;
+        }
+
+        .select-group select, .btn-reset {
+            background: var(--cell-bg);
+            color: var(--text-color);
+            border: none;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 1rem;
+            outline: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+
+        .select-group select:hover, .btn-reset:hover {
+            background: var(--last-move-bg);
+        }
+
+        .btn-reset {
+            background: var(--primary-color);
+            color: white;
+        }
+        .btn-reset:hover {
+            background: #059669;
+        }
+
+        .status-bar {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .turn-indicator {
+            padding: 4px 12px;
+            border-radius: 20px;
+            background: var(--board-bg);
+            transition: 0.3s;
+        }
+
+        .turn-x { color: var(--x-color); border: 1px solid var(--x-color); }
+        .turn-o { color: var(--o-color); border: 1px solid var(--o-color); }
+
+        /* Board Styling */
+        .board-container {
+            width: 100%;
+            max-width: 600px;
+            aspect-ratio: 1 / 1; /* Giữ bảng luôn hình vuông */
+            background-color: var(--cell-border);
+            border: 4px solid var(--board-bg);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+
+        .board {
+            display: grid;
             width: 100%;
             height: 100%;
-            overflow: hidden;
-            padding-top: 10px;
+            /* Mặc định 15x15. Sẽ set bằng JS */
+            grid-template-columns: repeat(15, 1fr);
+            grid-template-rows: repeat(15, 1fr);
+            gap: 1px; /* Tạo đường kẻ */
+            background-color: var(--cell-border);
         }
 
-        #game-board-area {
-            position: relative;
-            /* Tính toán kích thước tối đa để không bị tràn */
-            width: 95vw; 
-            height: 60vh; /* Dành 60% màn hình cho bàn chơi */
+        .cell {
+            background-color: var(--board-bg);
             display: flex;
-            align-items: center;
             justify-content: center;
+            align-items: center;
+            font-size: calc(100vw / 22); /* Chữ tự co giãn theo màn hình */
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
         }
 
-        #controls-area {
-            height: 30vh; /* Dành 30% màn hình cho nút bấm */
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding-bottom: 20px;
+        @media (min-width: 600px) {
+            .cell {
+                font-size: 28px; /* Cố định font trên màn PC */
+            }
+        }
+
+        .cell:hover {
+            background-color: var(--cell-bg);
+        }
+
+        .cell.x {
+            color: var(--x-color);
+            text-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+        }
+
+        .cell.o {
+            color: var(--o-color);
+            text-shadow: 0 0 8px rgba(14, 165, 233, 0.5);
+        }
+
+        /* Hiệu ứng ô vừa đánh */
+        .cell.last-move {
+            background-color: var(--last-move-bg);
+            box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.3);
+            animation: pulse 1.5s infinite;
+        }
+
+        /* Hiệu ứng dải ô chiến thắng */
+        .cell.win-cell {
+            background-color: var(--win-bg) !important;
+            color: #000 !important;
+            text-shadow: none !important;
+            transform: scale(1.05);
             z-index: 10;
         }
 
-        /* --- SPECIFIC GAME STYLES --- */
-        /* CARO */
-        .caro-grid {
-            display: grid;
-            background-color: #4b5563;
-            gap: 1px;
-            border: 2px solid #6b7280;
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        @keyframes pulse {
+            0% { box-shadow: inset 0 0 5px rgba(255, 255, 255, 0.2); }
+            50% { box-shadow: inset 0 0 15px rgba(255, 255, 255, 0.5); }
+            100% { box-shadow: inset 0 0 5px rgba(255, 255, 255, 0.2); }
         }
-        .caro-cell {
-            background-color: #1f2937;
+
+        /* Modal Kết Quả */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
             display: flex;
-            align-items: center;
             justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            z-index: 100;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .modal-content {
+            background: var(--board-bg);
+            padding: 30px 40px;
+            border-radius: 15px;
+            text-align: center;
+            transform: translateY(-50px);
+            transition: transform 0.3s;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .modal-overlay.active .modal-content {
+            transform: translateY(0);
+        }
+
+        .modal-title {
+            font-size: 2rem;
+            margin-bottom: 20px;
+        }
+
+        .modal-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            font-size: 1.2rem;
+            border-radius: 8px;
             cursor: pointer;
-            font-size: clamp(10px, 3vw, 24px); /* Chữ tự co giãn */
+            font-weight: bold;
         }
-        .caro-cell.last-move { background-color: #374151; box-shadow: inset 0 0 10px rgba(59, 130, 246, 0.5); }
-        
-        /* CHESS */
-        .chess-grid {
-            display: grid;
-            grid-template-columns: repeat(8, 1fr);
-            border: 4px solid #4b5563;
-        }
-        .chess-cell {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: clamp(20px, 8vw, 40px);
-            position: relative;
-        }
-        .c-white { background-color: #e5e7eb; color: #1f2937; }
-        .c-black { background-color: #4b5563; color: #e5e7eb; }
-        .c-selected { background-color: #fbbf24 !important; }
-        .c-hint::after {
-            content: ''; width: 12px; height: 12px; background: rgba(16, 185, 129, 0.6); border-radius: 50%;
-        }
-
-        /* SNAKE & TETRIS CANVAS */
-        canvas {
-            image-rendering: pixelated; /* Giữ nét pixel */
-            box-shadow: 0 0 15px rgba(0,0,0,0.5);
-            background: #000;
-        }
-
-        /* ANIMATIONS */
-        @keyframes pop { 0% { transform: scale(0); } 80% { transform: scale(1.2); } 100% { transform: scale(1); } }
-        .pop-in { animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
     </style>
 </head>
 <body>
 
-    <!-- 1. HEADER (Fixed Top) -->
-    <header class="h-14 bg-slate-900 border-b border-slate-700 flex items-center justify-between px-4 shrink-0 z-50 shadow-lg">
-        <div class="flex items-center gap-2">
-            <i class="fas fa-gamepad text-yellow-400 text-xl"></i>
-            <h1 class="font-bold text-lg tracking-wide retro-text text-white">ARCADE<span class="text-blue-500">VN</span></h1>
+    <header>
+        <h1>Cờ Caro Xịn</h1>
+        <div class="controls">
+            <div class="select-group">
+                <select id="gameMode">
+                    <option value="pve">Người vs Máy (AI)</option>
+                    <option value="pvp">Người vs Người</option>
+                </select>
+            </div>
+            <button class="btn-reset" onclick="initGame()">Chơi Lại</button>
         </div>
-        <button id="btn-back" class="hidden px-3 py-1 bg-red-600 rounded text-sm font-bold active:bg-red-700 transition-colors">
-            <i class="fas fa-arrow-left mr-1"></i> MENU
-        </button>
+        <div class="status-bar">
+            <span>Lượt đánh: </span>
+            <span id="turnIndicator" class="turn-indicator turn-x">Người chơi X</span>
+        </div>
     </header>
 
-    <!-- 2. MAIN MENU (Scrollable) -->
-    <main id="screen-menu" class="flex-1 w-full flex flex-col items-center pt-8">
-        <p class="text-slate-400 mb-4 text-sm">Chọn trò chơi để bắt đầu</p>
-        <div id="menu-grid">
-            <!-- Cards generated by JS -->
-        </div>
-    </main>
+    <div class="board-container">
+        <div class="board" id="board"></div>
+    </div>
 
-    <!-- 3. GAME PLAY SCREEN (Fixed Layout) -->
-    <section id="screen-game" class="hidden w-full h-full flex flex-col">
-        
-        <!-- Score Bar -->
-        <div class="h-10 bg-slate-800 flex justify-between items-center px-4 shrink-0 text-sm font-bold text-cyan-400 border-b border-slate-700">
-            <span id="game-status-text">Đang chơi...</span>
-            <div class="bg-slate-900 px-3 py-1 rounded border border-slate-600 text-yellow-400">
-                SCORE: <span id="score-val">0</span>
-            </div>
-        </div>
-
-        <!-- Game Wrapper -->
-        <div id="game-wrapper">
-            <!-- Game Board Area: Tự co giãn fit màn hình -->
-            <div id="game-board-area"></div>
-            
-            <!-- Controls Area: Nút bấm to cho mobile -->
-            <div id="controls-area"></div>
-        </div>
-    </section>
-
-    <!-- 4. MODAL (Game Over) -->
-    <div id="modal" class="fixed inset-0 bg-black/90 hidden flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
-        <div class="bg-slate-800 p-6 rounded-2xl border-2 border-slate-600 text-center w-full max-w-sm shadow-2xl">
-            <h2 id="modal-title" class="text-3xl font-bold text-yellow-400 mb-2 retro-text">GAME OVER</h2>
-            <p id="modal-msg" class="text-slate-300 mb-6">Bạn chơi rất hay!</p>
-            <div class="flex flex-col gap-3">
-                <button id="btn-restart" class="w-full py-3 bg-green-600 rounded-xl font-bold text-lg shadow-lg active:scale-95 transition-transform">CHƠI LẠI</button>
-                <button id="btn-home" class="w-full py-3 bg-slate-600 rounded-xl font-bold text-lg shadow-lg active:scale-95 transition-transform">VỀ MENU</button>
-            </div>
+    <!-- Modal thông báo người thắng -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal-content">
+            <h2 class="modal-title" id="modalMessage">X Chiến Thắng!</h2>
+            <button class="modal-btn" onclick="closeModalAndReset()">Chơi Ván Mới</button>
         </div>
     </div>
 
-<script>
-/**
- * ARCADE ENGINE V2 - OPTIMIZED FOR STABILITY
- */
+    <script>
+        const BOARD_SIZE = 15; // Bàn cờ 15x15 chuẩn caro
+        const boardElement = document.getElementById('board');
+        const turnIndicator = document.getElementById('turnIndicator');
+        const modeSelect = document.getElementById('gameMode');
+        const modalOverlay = document.getElementById('modalOverlay');
+        const modalMessage = document.getElementById('modalMessage');
 
-const App = {
-    currentGame: null,
-    elements: {},
-    games: [
-        { id: 'caro', name: 'Cờ Caro', icon: 'fa-times', color: '#ec4899', desc: 'AI Thông Minh' },
-        { id: 'chess', name: 'Cờ Vua', icon: 'fa-chess-knight', color: '#3b82f6', desc: 'Giao diện Chuẩn' },
-        { id: 'snake', name: 'Rắn Săn Mồi', icon: 'fa-dragon', color: '#22c55e', desc: 'Kinh điển' },
-        { id: 'tetris', name: 'Xếp Gạch', icon: 'fa-cubes', color: '#eab308', desc: 'Huyền thoại' }
-    ],
+        let board = [];
+        let currentPlayer = 'X'; // X đi trước
+        let gameActive = true;
+        let lastMoveElement = null;
+        let isAiThinking = false;
 
-    init() {
-        // Cache DOM elements
-        this.elements = {
-            menu: document.getElementById('screen-menu'),
-            game: document.getElementById('screen-game'),
-            grid: document.getElementById('menu-grid'),
-            backBtn: document.getElementById('btn-back'),
-            boardArea: document.getElementById('game-board-area'),
-            controlsArea: document.getElementById('controls-area'),
-            scoreVal: document.getElementById('score-val'),
-            statusText: document.getElementById('game-status-text'),
-            modal: document.getElementById('modal'),
-            modalTitle: document.getElementById('modal-title'),
-            modalMsg: document.getElementById('modal-msg'),
-            btnRestart: document.getElementById('btn-restart'),
-            btnHome: document.getElementById('btn-home')
-        };
+        // Điểm trọng số cho AI (Tấn công và Phòng thủ)
+        const attackScores = [0, 9, 54, 162, 1458, 13112, 118008];
+        const defenseScores = [0, 3, 27, 99, 729, 6561, 59049];
 
-        // Render Menu
-        this.games.forEach(g => {
-            const card = document.createElement('div');
-            card.className = 'game-card no-select btn-press';
-            card.innerHTML = `
-                <i class="fas ${g.icon} text-4xl mb-3" style="color: ${g.color}"></i>
-                <h3 class="font-bold text-lg uppercase">${g.name}</h3>
-                <span class="text-xs text-gray-400 mt-1">${g.desc}</span>
-            `;
-            card.onclick = () => this.launch(g.id);
-            this.elements.grid.appendChild(card);
-        });
-
-        // Global Event Listeners
-        this.elements.backBtn.onclick = () => this.goHome();
-        this.elements.btnHome.onclick = () => { this.toggleModal(false); this.goHome(); };
-        this.elements.btnRestart.onclick = () => { this.toggleModal(false); if(this.currentGame) this.currentGame.reset(); };
-
-        // Prevent Pull-to-refresh on mobile
-        document.body.addEventListener('touchmove', (e) => { if(this.currentGame) e.preventDefault(); }, { passive: false });
-    },
-
-    launch(gameId) {
-        this.elements.menu.classList.add('hidden');
-        this.elements.game.classList.remove('hidden');
-        this.elements.backBtn.classList.remove('hidden');
-        this.elements.boardArea.innerHTML = '';
-        this.elements.controlsArea.innerHTML = '';
-        this.updateScore(0);
-        this.updateStatus(this.games.find(g => g.id === gameId).name);
-
-        switch(gameId) {
-            case 'caro': this.currentGame = new CaroGame(this); break;
-            case 'chess': this.currentGame = new ChessGame(this); break;
-            case 'snake': this.currentGame = new SnakeGame(this); break;
-            case 'tetris': this.currentGame = new TetrisGame(this); break;
-        }
-    },
-
-    goHome() {
-        if(this.currentGame) this.currentGame.stop();
-        this.currentGame = null;
-        this.elements.menu.classList.remove('hidden');
-        this.elements.game.classList.add('hidden');
-        this.elements.backBtn.classList.add('hidden');
-    },
-
-    updateScore(val) { this.elements.scoreVal.innerText = val; },
-    updateStatus(text) { this.elements.statusText.innerText = text; },
-    
-    toggleModal(show, title = '', msg = '') {
-        if(show) {
-            this.elements.modalTitle.innerText = title;
-            this.elements.modalMsg.innerText = msg;
-            this.elements.modal.classList.remove('hidden');
-        } else {
-            this.elements.modal.classList.add('hidden');
-        }
-    }
-};
-
-/**
- * UTILS
- */
-const Utils = {
-    // Tự động tính kích thước bàn cờ sao cho vừa khít khu vực hiển thị (quan trọng để không bị vỡ)
-    getFitSize(container, aspectRatio = 1, padding = 10) {
-        const w = container.clientWidth - padding * 2;
-        const h = container.clientHeight - padding * 2;
-        const size = Math.min(w, h / aspectRatio);
-        return { w: size, h: size * aspectRatio };
-    },
-    createBtn(icon, cb, colorClass = 'bg-slate-700') {
-        const btn = document.createElement('button');
-        btn.className = `${colorClass} w-16 h-16 rounded-full text-2xl text-white shadow-lg flex items-center justify-center btn-press no-select`;
-        btn.innerHTML = `<i class="fas ${icon}"></i>`;
-        
-        // Support both touch and mouse for instant reaction
-        const trigger = (e) => { e.preventDefault(); cb(); };
-        btn.addEventListener('touchstart', trigger, {passive: false});
-        btn.addEventListener('mousedown', trigger);
-        return btn;
-    }
-};
-
-/**
- * GAME 1: CARO (GOMOKU) - OPTIMIZED GRID
- */
-class CaroGame {
-    constructor(app) {
-        this.app = app;
-        this.size = 15;
-        this.board = [];
-        this.gameOver = false;
-        this.turn = 'X';
-        this.init();
-    }
-
-    init() {
-        const container = this.app.elements.boardArea;
-        const dims = Utils.getFitSize(container);
-        
-        this.gridEl = document.createElement('div');
-        this.gridEl.className = 'caro-grid';
-        this.gridEl.style.width = `${dims.w}px`;
-        this.gridEl.style.height = `${dims.w}px`; // Square
-        this.gridEl.style.gridTemplateColumns = `repeat(${this.size}, 1fr)`;
-
-        this.board = Array(this.size).fill(null).map(() => Array(this.size).fill(null));
-
-        for(let y=0; y<this.size; y++) {
-            for(let x=0; x<this.size; x++) {
-                const cell = document.createElement('div');
-                cell.className = 'caro-cell';
-                cell.dataset.x = x;
-                cell.dataset.y = y;
-                cell.onclick = () => this.play(x, y);
-                this.gridEl.appendChild(cell);
-            }
-        }
-        container.appendChild(this.gridEl);
-
-        // Control Panel (Chỉ nút reset)
-        const ctrl = this.app.elements.controlsArea;
-        ctrl.innerHTML = `<div class="text-slate-400 text-sm text-center">Bạn: X (Đi trước)<br>Máy: O</div>`;
-    }
-
-    play(x, y) {
-        if(this.gameOver || this.board[y][x]) return;
-        
-        this.mark(x, y, 'X');
-        if(this.checkWin(x, y, 'X')) {
-            this.end("BẠN THẮNG!", "Tuyệt kỹ Anime vô đối!");
-            return;
-        }
-
-        this.turn = 'O';
-        this.app.updateStatus("Máy đang nghĩ...");
-        setTimeout(() => this.aiMove(), 500);
-    }
-
-    mark(x, y, player) {
-        this.board[y][x] = player;
-        const cell = this.gridEl.children[y * this.size + x];
-        
-        // Anime styling
-        cell.innerHTML = player === 'X' 
-            ? '<i class="fas fa-times text-cyan-400 pop-in drop-shadow-[0_0_5px_rgba(34,211,238,0.8)]"></i>' 
-            : '<i class="far fa-circle text-pink-500 pop-in drop-shadow-[0_0_5px_rgba(236,72,153,0.8)]"></i>';
-        
-        // Last move highlight
-        const last = this.gridEl.querySelector('.last-move');
-        if(last) last.classList.remove('last-move');
-        cell.classList.add('last-move');
-    }
-
-    aiMove() {
-        if(this.gameOver) return;
-        
-        // Basic AI Logic: Block or Random nearby
-        let bestMove = null;
-        let bestScore = -Infinity;
-
-        // Simplify search space to occupied + neighbors
-        let moves = [];
-        for(let y=0; y<this.size; y++) {
-            for(let x=0; x<this.size; x++) {
-                if(!this.board[y][x] && this.hasNeighbor(x, y)) {
-                    moves.push({x, y});
+        // Khởi tạo ván game
+        function initGame() {
+            boardElement.innerHTML = '';
+            boardElement.style.gridTemplateColumns = `repeat(${BOARD_SIZE}, 1fr)`;
+            boardElement.style.gridTemplateRows = `repeat(${BOARD_SIZE}, 1fr)`;
+            
+            board = [];
+            for (let i = 0; i < BOARD_SIZE; i++) {
+                let row = [];
+                for (let j = 0; j < BOARD_SIZE; j++) {
+                    row.push('');
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.dataset.row = i;
+                    cell.dataset.col = j;
+                    cell.addEventListener('click', handleCellClick);
+                    boardElement.appendChild(cell);
                 }
+                board.push(row);
             }
-        }
-        if(moves.length === 0) moves.push({x:7, y:7}); // Center if empty
 
-        for(let m of moves) {
-            let score = this.evaluate(m.x, m.y);
-            if(score > bestScore) {
-                bestScore = score;
-                bestMove = m;
-            }
+            currentPlayer = 'X';
+            gameActive = true;
+            lastMoveElement = null;
+            isAiThinking = false;
+            updateTurnIndicator();
         }
 
-        if(bestMove) {
-            this.mark(bestMove.x, bestMove.y, 'O');
-            if(this.checkWin(bestMove.x, bestMove.y, 'O')) {
-                this.end("MÁY THẮNG", "Thua keo này ta bày keo khác!");
+        // Xử lý khi click vào ô
+        function handleCellClick(e) {
+            if (!gameActive || isAiThinking) return;
+
+            const row = parseInt(e.target.dataset.row);
+            const col = parseInt(e.target.dataset.col);
+
+            if (board[row][col] !== '') return; // Ô đã có người đánh
+
+            makeMove(row, col, currentPlayer);
+
+            if (!gameActive) return; // Nếu đánh xong mà kết thúc game thì ngưng
+
+            // Chế độ đánh với Máy
+            if (modeSelect.value === 'pve' && currentPlayer === 'O') {
+                isAiThinking = true;
+                updateTurnIndicator("AI đang nghĩ...");
+                setTimeout(makeAiMove, 300); // Tạo độ trễ giả cho AI để UX tốt hơn
+            }
+        }
+
+        // Thực hiện nước đi
+        function makeMove(row, col, player) {
+            board[row][col] = player;
+            const cell = getCellElement(row, col);
+            cell.textContent = player;
+            cell.classList.add(player.toLowerCase());
+
+            // Xử lý hiệu ứng "Ô vừa đánh" (Hủy ô cũ, sáng ô mới)
+            if (lastMoveElement) {
+                lastMoveElement.classList.remove('last-move');
+            }
+            cell.classList.add('last-move');
+            lastMoveElement = cell;
+
+            // Kiểm tra thắng thua
+            const winCells = checkWin(row, col, player);
+            if (winCells) {
+                highlightWinCells(winCells);
+                showModal(`${player === 'X' ? 'Người chơi X' : (modeSelect.value === 'pve' ? 'Máy (O)' : 'Người chơi O')} Chiến Thắng!`);
+                gameActive = false;
+                return;
+            }
+
+            // Kiểm tra hòa
+            if (checkDraw()) {
+                showModal("Ván Cờ Hòa!");
+                gameActive = false;
+                return;
+            }
+
+            // Đổi lượt
+            currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+            updateTurnIndicator();
+        }
+
+        // Lấy element từ tọa độ
+        function getCellElement(row, col) {
+            return boardElement.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+        }
+
+        // Cập nhật text hiển thị lượt
+        function updateTurnIndicator(customText = null) {
+            turnIndicator.className = `turn-indicator turn-${currentPlayer.toLowerCase()}`;
+            if (customText) {
+                turnIndicator.textContent = customText;
             } else {
-                this.turn = 'X';
-                this.app.updateStatus("Lượt của bạn");
+                let name = currentPlayer === 'X' ? 'Người chơi X' : 'Người chơi O';
+                if (modeSelect.value === 'pve' && currentPlayer === 'O') name = 'Máy (O)';
+                turnIndicator.textContent = `Lượt của: ${name}`;
             }
         }
-    }
 
-    hasNeighbor(x, y) {
-        for(let dy=-1; dy<=1; dy++) for(let dx=-1; dx<=1; dx++) {
-            let nx=x+dx, ny=y+dy;
-            if(nx>=0 && nx<this.size && ny>=0 && ny<this.size && this.board[ny][nx]) return true;
-        }
-        return false;
-    }
-
-    evaluate(x, y) {
-        // Simple heuristic: Prioritize winning > blocking > random
-        this.board[y][x] = 'O';
-        if(this.checkLine(x, y, 'O')) { this.board[y][x] = null; return 10000; }
-        this.board[y][x] = 'X'; // Assume opponent moves here
-        if(this.checkLine(x, y, 'X')) { this.board[y][x] = null; return 9000; } // Block win
-        this.board[y][x] = null;
-        return Math.random();
-    }
-
-    checkWin(x, y, p) {
-        if(this.checkLine(x, y, p)) {
-            this.gameOver = true;
-            return true;
-        }
-        return false;
-    }
-
-    checkLine(x, y, p) {
-        const dirs = [[1,0], [0,1], [1,1], [1,-1]];
-        for(let [dx, dy] of dirs) {
-            let count = 1;
-            for(let i=1; i<5; i++) { if(this.getCell(x+dx*i, y+dy*i)===p) count++; else break; }
-            for(let i=1; i<5; i++) { if(this.getCell(x-dx*i, y-dy*i)===p) count++; else break; }
-            if(count >= 5) return true;
-        }
-        return false;
-    }
-
-    getCell(x, y) { return (x>=0 && y>=0 && x<this.size && y<this.size) ? this.board[y][x] : null; }
-    end(title, msg) { this.app.toggleModal(true, title, msg); }
-    stop() {}
-    reset() { this.app.launch('caro'); }
-}
-
-/**
- * GAME 2: CHESS - MOBILE OPTIMIZED
- */
-class ChessGame {
-    constructor(app) {
-        this.app = app;
-        this.selected = null;
-        this.turn = 'white';
-        this.board = [];
-        this.init();
-    }
-
-    init() {
-        const dims = Utils.getFitSize(this.app.elements.boardArea);
-        this.gridEl = document.createElement('div');
-        this.gridEl.className = 'chess-grid shadow-2xl';
-        this.gridEl.style.width = `${dims.w}px`;
-        this.gridEl.style.height = `${dims.w}px`;
-        
-        this.resetBoard();
-        this.render();
-        this.app.elements.boardArea.appendChild(this.gridEl);
-        
-        this.app.elements.controlsArea.innerHTML = `<div class="text-slate-400 text-sm">Chạm quân để chọn<br>Chạm ô xanh để đi</div>`;
-    }
-
-    resetBoard() {
-        const row1 = ['♜','♞','♝','♛','♚','♝','♞','♜'];
-        const row2 = Array(8).fill('♟');
-        const row7 = Array(8).fill('♙');
-        const row8 = ['♖','♘','♗','♕','♔','♗','♘','♖'];
-        this.board = [
-            [...row1], [...row2],
-            Array(8).fill(''), Array(8).fill(''), Array(8).fill(''), Array(8).fill(''),
-            [...row7], [...row8]
-        ];
-    }
-
-    render() {
-        this.gridEl.innerHTML = '';
-        let isBlack = false;
-        for(let r=0; r<8; r++) {
-            for(let c=0; c<8; c++) {
-                const cell = document.createElement('div');
-                cell.className = `chess-cell ${isBlack ? 'c-black' : 'c-white'}`;
-                cell.innerText = this.board[r][c];
-                
-                // Highlight Selection
-                if(this.selected && this.selected.r === r && this.selected.c === c) {
-                    cell.classList.add('c-selected');
-                }
-                // Highlight Moves (Simple)
-                if(this.selected && this.isValidMove(this.selected.r, this.selected.c, r, c)) {
-                    cell.classList.add('c-hint');
-                    cell.onclick = () => this.move(r, c);
-                } else {
-                    cell.onclick = () => this.select(r, c);
-                }
-
-                this.gridEl.appendChild(cell);
-                isBlack = !isBlack;
-            }
-            isBlack = !isBlack;
-        }
-    }
-
-    select(r, c) {
-        const p = this.board[r][c];
-        if(!p) return;
-        const isWhite = '♖♘♗♕♔♙'.includes(p);
-        if((this.turn === 'white' && isWhite) || (this.turn === 'black' && !isWhite)) {
-            this.selected = {r, c};
-            this.render();
-        }
-    }
-
-    move(r, c) {
-        const p = this.board[this.selected.r][this.selected.c];
-        this.board[r][c] = p;
-        this.board[this.selected.r][this.selected.c] = '';
-        this.selected = null;
-        this.turn = this.turn === 'white' ? 'black' : 'white';
-        this.render();
-        
-        if(this.turn === 'black') {
-            this.app.updateStatus("Máy đang tính...");
-            setTimeout(() => this.aiMove(), 500);
-        } else {
-            this.app.updateStatus("Lượt của bạn");
-        }
-    }
-
-    // Very simplified Arcade Logic for movement (not engine level)
-    isValidMove(r1, c1, r2, c2) {
-        if(r1===r2 && c1===c2) return false;
-        // Prevent friendly fire
-        const t = this.board[r2][c2];
-        const p = this.board[r1][c1];
-        const isWhite = '♖♘♗♕♔♙'.includes(p);
-        const isTargetWhite = '♖♘♗♕♔♙'.includes(t);
-        if(t !== '' && isWhite === isTargetWhite) return false;
-        return true; // Arcade: Allow any move to empty/enemy for fun if not strictly checking
-    }
-
-    aiMove() {
-        // Random Arcade AI
-        let moves = [];
-        for(let r=0; r<8; r++) {
-            for(let c=0; c<8; c++) {
-                if('♜♞♝♛♚♟'.includes(this.board[r][c])) {
-                    // Try to capture
-                    for(let rr=0; rr<8; rr++) for(let cc=0; cc<8; cc++) {
-                        if(this.board[rr][cc] !== '' && '♖♘♗♕♔♙'.includes(this.board[rr][cc])) {
-                            moves.push({fr:r, fc:c, tr:rr, tc:cc, w: 10});
+        // --- Logic AI (Máy đánh) ---
+        function makeAiMove() {
+            let bestScore = -Infinity;
+            let bestMove = { row: -1, col: -1 };
+            
+            // Lặp qua toàn bộ bàn cờ để chấm điểm
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    if (board[r][c] === '') {
+                        let score = evaluateCell(r, c);
+                        if (score > bestScore) {
+                            bestScore = score;
+                            bestMove = { row: r, col: c };
                         }
                     }
-                    // Or move random
-                    moves.push({fr:r, fc:c, tr:r+(Math.random()>0.5?1:-1), tc:c, w:1});
                 }
             }
-        }
-        
-        // Pick best weighted
-        moves.sort((a,b) => b.w - a.w);
-        if(moves.length) {
-            const m = moves[0];
-            // Ensure bounds
-            if(m.tr>=0 && m.tr<8 && m.tc>=0 && m.tc<8) {
-                this.board[m.tr][m.tc] = this.board[m.fr][m.fc];
-                this.board[m.fr][m.fc] = '';
+
+            // Đánh vào ô có điểm cao nhất
+            // Nếu bàn cờ trống hoàn toàn, đánh vào giữa
+            if (bestMove.row === -1) {
+                bestMove = { row: Math.floor(BOARD_SIZE/2), col: Math.floor(BOARD_SIZE/2) };
             }
-        }
-        
-        this.turn = 'white';
-        this.app.updateStatus("Lượt của bạn");
-        this.render();
-    }
-    stop() {}
-    reset() { this.init(); }
-}
 
-/**
- * GAME 3: SNAKE (CANVAS)
- */
-class SnakeGame {
-    constructor(app) {
-        this.app = app;
-        this.grid = 20;
-        this.snake = [];
-        this.dir = {x: 0, y: 0};
-        this.loopId = null;
-        this.score = 0;
-        this.init();
-    }
-
-    init() {
-        const area = this.app.elements.boardArea;
-        const dims = Utils.getFitSize(area, 0.8); // Portrait aspect
-        
-        this.canvas = document.createElement('canvas');
-        this.canvas.width = Math.floor(dims.w / this.grid) * this.grid;
-        this.canvas.height = Math.floor(dims.h / this.grid) * this.grid;
-        this.ctx = this.canvas.getContext('2d');
-        area.appendChild(this.canvas);
-
-        // Controls
-        const c = this.app.elements.controlsArea;
-        c.className = "flex items-center justify-center h-full";
-        
-        const dpad = document.createElement('div');
-        dpad.className = "grid grid-cols-3 gap-2";
-        dpad.appendChild(document.createElement('div'));
-        dpad.appendChild(Utils.createBtn('fa-arrow-up', () => this.setDir(0, -1)));
-        dpad.appendChild(document.createElement('div'));
-        dpad.appendChild(Utils.createBtn('fa-arrow-left', () => this.setDir(-1, 0)));
-        dpad.appendChild(Utils.createBtn('fa-circle', () => {}, 'bg-slate-800')); // Center anchor
-        dpad.appendChild(Utils.createBtn('fa-arrow-right', () => this.setDir(1, 0)));
-        dpad.appendChild(document.createElement('div'));
-        dpad.appendChild(Utils.createBtn('fa-arrow-down', () => this.setDir(0, 1)));
-        c.appendChild(dpad);
-
-        this.resetGame();
-    }
-
-    resetGame() {
-        this.snake = [{x: 5, y: 5}, {x: 4, y: 5}];
-        this.food = this.getFood();
-        this.dir = {x: 1, y: 0};
-        this.nextDir = {x: 1, y: 0};
-        this.score = 0;
-        this.lastTime = 0;
-        this.speed = 150; // ms
-        if(this.loopId) cancelAnimationFrame(this.loopId);
-        this.loopId = requestAnimationFrame(t => this.loop(t));
-    }
-
-    setDir(x, y) {
-        if (this.dir.x === -x && this.dir.y === -y) return;
-        this.nextDir = {x, y};
-    }
-
-    getFood() {
-        const cols = this.canvas.width / this.grid;
-        const rows = this.canvas.height / this.grid;
-        return {
-            x: Math.floor(Math.random() * cols),
-            y: Math.floor(Math.random() * rows)
-        };
-    }
-
-    loop(time) {
-        this.loopId = requestAnimationFrame(t => this.loop(t));
-        if (time - this.lastTime < this.speed) return;
-        this.lastTime = time;
-
-        this.update();
-        this.draw();
-    }
-
-    update() {
-        this.dir = this.nextDir;
-        const head = {x: this.snake[0].x + this.dir.x, y: this.snake[0].y + this.dir.y};
-        const cols = this.canvas.width / this.grid;
-        const rows = this.canvas.height / this.grid;
-
-        // Wrap walls
-        if(head.x < 0) head.x = cols-1;
-        if(head.x >= cols) head.x = 0;
-        if(head.y < 0) head.y = rows-1;
-        if(head.y >= rows) head.y = 0;
-
-        // Self collision
-        if (this.snake.some(s => s.x === head.x && s.y === head.y)) {
-            cancelAnimationFrame(this.loopId);
-            this.app.toggleModal(true, "GAME OVER", `Điểm: ${this.score}`);
-            return;
+            makeMove(bestMove.row, bestMove.col, 'O');
+            isAiThinking = false;
         }
 
-        this.snake.unshift(head);
+        // Hàm chấm điểm 1 ô trống cho AI
+        function evaluateCell(row, col) {
+            let totalScore = 0;
+            const directions = [
+                [0, 1], [1, 0], [1, 1], [1, -1] // Ngang, dọc, chéo chính, chéo phụ
+            ];
 
-        // Eat food
-        if (head.x === this.food.x && head.y === this.food.y) {
-            this.score += 10;
-            this.app.updateScore(this.score);
-            this.food = this.getFood();
-            // Speed up
-            if(this.speed > 50) this.speed -= 2;
-        } else {
-            this.snake.pop();
-        }
-    }
+            directions.forEach(dir => {
+                let attack = evaluateDirection(row, col, dir[0], dir[1], 'O'); // Điểm tấn công
+                let defense = evaluateDirection(row, col, dir[0], dir[1], 'X'); // Điểm chặn người chơi
+                
+                // AI Gomoku: Phòng thủ thường quan trọng bằng hoặc hơn tấn công để sống sót
+                totalScore += attackScores[attack.count] + defenseScores[defense.count];
 
-    draw() {
-        this.ctx.fillStyle = '#111827';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-        // Food
-        this.ctx.fillStyle = '#ef4444';
-        this.ctx.beginPath();
-        this.ctx.arc(
-            this.food.x * this.grid + this.grid/2,
-            this.food.y * this.grid + this.grid/2,
-            this.grid/2 - 2, 0, Math.PI*2
-        );
-        this.ctx.fill();
-
-        // Snake
-        this.ctx.fillStyle = '#22c55e';
-        this.snake.forEach((s, i) => {
-            if(i===0) this.ctx.fillStyle = '#4ade80'; // Head lighter
-            else this.ctx.fillStyle = '#22c55e';
-            
-            this.ctx.fillRect(s.x * this.grid + 1, s.y * this.grid + 1, this.grid - 2, this.grid - 2);
-        });
-    }
-
-    stop() { cancelAnimationFrame(this.loopId); }
-    reset() { this.resetGame(); }
-}
-
-/**
- * GAME 4: TETRIS (Basic Logic)
- */
-class TetrisGame {
-    constructor(app) {
-        this.app = app;
-        this.grid = 20;
-        this.cols = 10;
-        this.rows = 20;
-        this.init();
-    }
-    
-    init() {
-        const area = this.app.elements.boardArea;
-        // Tetris is usually 1:2 aspect ratio
-        const dims = Utils.getFitSize(area, 0.5); 
-        this.canvas = document.createElement('canvas');
-        this.canvas.width = dims.w;
-        this.canvas.height = dims.h;
-        this.grid = dims.w / this.cols; // Recalculate grid based on width
-        this.ctx = this.canvas.getContext('2d');
-        area.appendChild(this.canvas);
-        
-        // Controls
-        const c = this.app.elements.controlsArea;
-        c.innerHTML = '';
-        const row = document.createElement('div');
-        row.className = "flex gap-4";
-        row.appendChild(Utils.createBtn('fa-arrow-left', () => this.move(-1), 'bg-blue-600'));
-        row.appendChild(Utils.createBtn('fa-redo', () => this.rotate(), 'bg-yellow-600'));
-        row.appendChild(Utils.createBtn('fa-arrow-right', () => this.move(1), 'bg-blue-600'));
-        row.appendChild(Utils.createBtn('fa-arrow-down', () => this.drop(), 'bg-red-600'));
-        c.appendChild(row);
-
-        this.resetGame();
-    }
-
-    resetGame() {
-        this.board = Array(this.rows).fill().map(() => Array(this.cols).fill(0));
-        this.score = 0;
-        this.dropInterval = 1000;
-        this.dropCounter = 0;
-        this.lastTime = 0;
-        this.colors = [null, '#f00', '#0f0', '#00f', '#ff0', '#0ff', '#f0f', '#fa0'];
-        this.newPiece();
-        
-        if(this.loopId) cancelAnimationFrame(this.loopId);
-        this.loopId = requestAnimationFrame(t => this.loop(t));
-    }
-
-    newPiece() {
-        const shapes = ['I','L','J','O','Z','S','T'];
-        const type = shapes[Math.floor(Math.random()*shapes.length)];
-        this.piece = {
-            matrix: this.createPiece(type),
-            pos: {x: Math.floor(this.cols/2)-1, y: 0},
-            color: Math.floor(Math.random()*7)+1
-        };
-        if(this.collide()) {
-             cancelAnimationFrame(this.loopId);
-             this.app.toggleModal(true, "GAME OVER", `Điểm: ${this.score}`);
-        }
-    }
-
-    createPiece(type) {
-        if(type==='I') return [[0,1,0,0],[0,1,0,0],[0,1,0,0],[0,1,0,0]];
-        if(type==='O') return [[1,1],[1,1]];
-        if(type==='T') return [[0,1,0],[1,1,1],[0,0,0]];
-        if(type==='L') return [[0,1,0],[0,1,0],[0,1,1]];
-        if(type==='J') return [[0,1,0],[0,1,0],[1,1,0]];
-        if(type==='Z') return [[1,1,0],[0,1,1],[0,0,0]];
-        if(type==='S') return [[0,1,1],[1,1,0],[0,0,0]];
-    }
-
-    collide() {
-        const [m, o] = [this.piece.matrix, this.piece.pos];
-        for(let y=0; y<m.length; ++y) for(let x=0; x<m[y].length; ++x) {
-            if(m[y][x] !== 0 && (this.board[y+o.y] && this.board[y+o.y][x+o.x]) !== 0) return true;
-        }
-        return false;
-    }
-
-    merge() {
-        this.piece.matrix.forEach((row, y) => {
-            row.forEach((val, x) => {
-                if(val) this.board[y+this.piece.pos.y][x+this.piece.pos.x] = this.piece.color;
+                // Thưởng điểm nếu cờ mở 2 đầu
+                if (attack.openEnds === 2) totalScore += attackScores[attack.count] * 0.5;
+                if (defense.openEnds === 2) totalScore += defenseScores[defense.count] * 0.5;
             });
-        });
-    }
 
-    rotate() {
-        const rot = this.piece.matrix.map((_, i) => this.piece.matrix.map(row => row[i]).reverse());
-        const old = this.piece.matrix;
-        this.piece.matrix = rot;
-        if(this.collide()) this.piece.matrix = old; // Revert if invalid
-    }
-
-    move(dir) {
-        this.piece.pos.x += dir;
-        if(this.collide()) this.piece.pos.x -= dir;
-    }
-
-    drop() {
-        this.piece.pos.y++;
-        if(this.collide()) {
-            this.piece.pos.y--;
-            this.merge();
-            this.sweep();
-            this.newPiece();
+            return totalScore;
         }
-        this.dropCounter = 0;
-    }
 
-    sweep() {
-        outer: for(let y=this.rows-1; y>0; --y) {
-            for(let x=0; x<this.cols; ++x) if(this.board[y][x] === 0) continue outer;
-            const row = this.board.splice(y, 1)[0].fill(0);
-            this.board.unshift(row);
-            ++y;
-            this.score += 100;
-            this.app.updateScore(this.score);
+        // Đếm số cờ liên tiếp và độ mở của 1 hướng
+        function evaluateDirection(row, col, dRow, dCol, player) {
+            let count = 0;
+            let openEnds = 0;
+
+            // Kiểm tra chiều tiến
+            let r = row + dRow, c = col + dCol;
+            while (r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE && board[r][c] === player) {
+                count++;
+                r += dRow;
+                c += dCol;
+            }
+            if (r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE && board[r][c] === '') openEnds++;
+
+            // Kiểm tra chiều lùi
+            r = row - dRow; c = col - dCol;
+            while (r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE && board[r][c] === player) {
+                count++;
+                r -= dRow;
+                c -= dCol;
+            }
+            if (r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE && board[r][c] === '') openEnds++;
+
+            return { count: Math.min(count, 5), openEnds };
         }
-    }
 
-    loop(time) {
-        const dt = time - this.lastTime;
-        this.lastTime = time;
-        this.dropCounter += dt;
-        if(this.dropCounter > this.dropInterval) this.drop();
-        
-        this.draw();
-        this.loopId = requestAnimationFrame(t => this.loop(t));
-    }
+        // --- Logic Kiểm tra Thắng ---
+        function checkWin(row, col, player) {
+            const directions = [
+                [[0, 1], [0, -1]], // Ngang
+                [[1, 0], [-1, 0]], // Dọc
+                [[1, 1], [-1, -1]],// Chéo \
+                [[1, -1], [-1, 1]] // Chéo /
+            ];
 
-    draw() {
-        this.ctx.fillStyle = '#111827';
-        this.ctx.fillRect(0,0,this.canvas.width, this.canvas.height);
-        
-        this.drawMatrix(this.board, {x:0, y:0});
-        this.drawMatrix(this.piece.matrix, this.piece.pos, this.piece.color);
-    }
+            for (let dir of directions) {
+                let count = 1;
+                let winCells = [{row, col}];
 
-    drawMatrix(mat, off, colorOverride = null) {
-        mat.forEach((row, y) => {
-            row.forEach((val, x) => {
-                if(val!==0) {
-                    this.ctx.fillStyle = colorOverride ? this.colors[colorOverride] : this.colors[val];
-                    this.ctx.fillRect((x+off.x)*this.grid, (y+off.y)*this.grid, this.grid-1, this.grid-1);
+                for (let d of dir) {
+                    let r = row + d[0];
+                    let c = col + d[1];
+                    while (r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE && board[r][c] === player) {
+                        count++;
+                        winCells.push({row: r, col: c});
+                        r += d[0];
+                        c += d[1];
+                    }
                 }
+
+                if (count >= 5) {
+                    return winCells; // Trả về mảng các ô thắng
+                }
+            }
+            return null;
+        }
+
+        // Tô màu các ô chiến thắng
+        function highlightWinCells(cells) {
+            cells.forEach(pos => {
+                const cell = getCellElement(pos.row, pos.col);
+                cell.classList.add('win-cell');
             });
-        });
-    }
+        }
 
-    stop() { cancelAnimationFrame(this.loopId); }
-    reset() { this.resetGame(); }
-}
+        // Kiểm tra hòa (đầy bàn cờ)
+        function checkDraw() {
+            for (let i = 0; i < BOARD_SIZE; i++) {
+                for (let j = 0; j < BOARD_SIZE; j++) {
+                    if (board[i][j] === '') return false;
+                }
+            }
+            return true;
+        }
 
-// Start
-window.onload = () => App.init();
-</script>
+        // --- Xử lý Giao diện ---
+        function showModal(message) {
+            modalMessage.textContent = message;
+            // Delay hiện modal một chút để người chơi thấy rõ đường cờ thắng
+            setTimeout(() => {
+                modalOverlay.classList.add('active');
+            }, 500);
+        }
+
+        function closeModalAndReset() {
+            modalOverlay.classList.remove('active');
+            initGame();
+        }
+
+        // Lắng nghe thay đổi chế độ chơi để reset game
+        modeSelect.addEventListener('change', initGame);
+
+        // Khởi động game lần đầu
+        initGame();
+
+    </script>
 </body>
 </html>
-
 
