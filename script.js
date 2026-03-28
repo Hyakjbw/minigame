@@ -81,7 +81,8 @@ const PATTERNS = [
   { regex: /\.PPPP\./, score: SCORE_OPEN_4 },
   { regex: /BPPPP\./, score: SCORE_CLOSED_4 },
   { regex: /\.PPPPB/, score: SCORE_CLOSED_4 },
-  { regex: /P\.PPP/, score: SCORE_CLOSED regex: /PPP\.P/, score: SCORE_CLOSED_4 },
+  { regex: /P\.PPP/, score: SCORE_CLOSED_4 },
+  { regex: /PPP\.P/, score: SCORE_CLOSED_4 },
   { regex: /PP\.PP/, score: SCORE_CLOSED_4 },
   { regex: /\.PPP\./, score: SCORE_OPEN_3 },
   { regex: /\.P\./, score: SCORE_OPEN_3 },
@@ -106,14 +107,16 @@ function flattenBoard2D(b2) {
 }
 function unflattenTo2D(board1D) {
   const b = emptyBoard();
-  for (let i = 0; i < BOARD_SIZE * BOARD_SIZE;    b[Math.floor(i / BOARD_SIZE)][i % BOARD_SIZE] = board1D[i] || "";
+  for (let i = 0; i < BOARD_SIZE * BOARD_SIZE; i++) {
+    b[Math.floor(i / BOARD_SIZE)][i % BOARD_SIZE] = board1D[i] || "";
   }
   return b;
 }
 function indexOfMove(r, c) {
   return r * BOARD_SIZE + c;
 }
-function  return { r: Math.floor(idx / BOARD_SIZE), c: idx % BOARD_SIZE };
+function rcFromIndex(idx) {
+  return { r: Math.floor(idx / BOARD_SIZE), c: idx % BOARD_SIZE };
 }
 function getCellElement(r, c) {
   return boardElement.querySelector(`[data-row="${r}"][data-col="${c}"]`);
@@ -126,12 +129,16 @@ function showModal(msg) {
 /* =======================
    UI
 ======================= */
-function update const mode = modeSelect.value;
+function updateUIState() {
+  const mode = modeSelect.value;
 
   if (State.isAiThinking) {
     turnIndicator.textContent = "💻 Máy đang tính...";
     turnIndicator.style.color = "#94a3b8";
     turnIndicator.style.borderColor = "#94a3b8";
+    return;
+  }
+
   if (mode === "pvp") {
     turnIndicator.textContent = `Lượt đi: Người chơi ${State.currentPlayer}`;
     turnIndicator.style.color = State.currentPlayer === "X" ? "var(--x-color)" : "var(--o-color)";
@@ -167,6 +174,7 @@ function update const mode = modeSelect.value;
    INIT / RENDER
 ======================= */
 function buildBoardDOM() {
+  if (!boardElement) return;
   boardElement.innerHTML = "";
   for (let r = 0; r < BOARD_SIZE; r++) {
     for (let c = 0; c < BOARD_SIZE; c++) {
@@ -187,13 +195,20 @@ function resetLocalGame(keepOnline = false) {
   State.gameActive = true;
   State.lastMoveElement = null;
   State.isAiThinking = false;
-  modalOverlay.classList.remove("active  if (!keepOnline) {
+  
+  if (modalOverlay) {
+    modalOverlay.classList.remove("active");
+  }
+
+  if (!keepOnline) {
     if (State.unsubscribeRoom) { State.unsubscribeRoom(); State.unsubscribeRoom = null; }
     State.currentRoomId = null;
     State.mySide = null;
     State.currentResetSignal = 0;
-    roomStatus.innerHTML = "";
+    if (roomStatus) roomStatus.innerHTML = "";
   }
+  
+  buildBoardDOM();
   updateUIState();
 }
 
@@ -215,7 +230,7 @@ function checkWinOnBoard(board2D, row, col, player) {
     let count = 1;
     for (const [dr, dc] of dir) {
       let r = row + dr, c = col + dc;
-     , c) && board2D[r][c] === player) {
+      while (inBounds(r, c) && board2D[r][c] === player) {
         count++;
         r += dr; c += dc;
       }
@@ -247,8 +262,11 @@ function checkWin(row, col, player) {
   return null;
 }
 
-function) {
-  cells.forEach(p => getCellElement(p.row, p.col).classList.add("win-cell"));
+function highlightWinCells(cells) {
+  cells.forEach(p => {
+    const el = getCellElement(p.row, p.col);
+    if(el) el.classList.add("win-cell");
+  });
 }
 
 /* =======================
@@ -262,12 +280,14 @@ function applyMoveLocally(r, c, player) {
   State.board[r][c] = player;
 
   const cell = getCellElement(r, c);
-  cell.textContent = player;
-  cell.classList.add(player.toLowerCase());
+  if (cell) {
+    cell.textContent = player;
+    cell.classList.add(player.toLowerCase());
 
-  if (State.lastMoveElement) State.lastMoveElement.classList.remove("last-move");
-  cell.classList.add("last-move");
-  State.lastMoveElement = cell;
+    if (State.lastMoveElement) State.lastMoveElement.classList.remove("last-move");
+    cell.classList.add("last-move");
+    State.lastMoveElement = cell;
+  }
 
   State.moveHistory.push({ row: r, col: c, player, element: cell });
 
@@ -276,7 +296,7 @@ function applyMoveLocally(r, c, player) {
     highlightWinCells(winCells);
     State.gameActive = false;
 
-    const mode = modeSelect.value;
+    const mode = modeSelect ? modeSelect.value : "pvp";
     let msg = "";
     if (mode === "online") msg = (player === State.mySide) ? "🎉 Bạn đã chiến thắng!" : "🥲 Đối thủ đã thắng!";
     else if (mode === "pvp") msg = `🎉 Người chơi ${player} thắng!`;
@@ -298,11 +318,12 @@ function applyMoveLocally(r, c, player) {
 }
 
 /* =======================
-   AI (easy/medium/h cũ
+   AI (easy/medium/hard)
 ======================= */
 function getAxisString(r, c, dr, dc, player, opp) {
   let str = "";
-  for (let i = -4; i <= 4; i nr = r + dr * i;
+  for (let i = -4; i <= 4; i++) {
+    const nr = r + dr * i;
     const nc = c + dc * i;
     if (!inBounds(nr, nc)) str += "B";
     else if (State.board[nr][nc] === player) str += "P";
@@ -349,14 +370,17 @@ function calculateLocalAIMove(difficulty, aiSide) {
       let near = false;
       for (let i = -2; i <= 2 && !near; i++) {
         for (let j = -2; j <= 2; j++) {
-          const nr = r + i, nc = c j;
-          if (inBounds(nr, nc) && State.board[nr][nc] !== "") { near true; break; }
+          const nr = r + i, nc = c + j;
+          if (inBounds(nr, nc) && State.board[nr][nc] !== "") { 
+              near = true; 
+              break; 
+          }
         }
       }
       if (!near) continue;
 
       const ev = evaluateCellPro(r, c, aiSide, oppSide);
-      candidates.push({ r, c, aiScore: ev.aiScore, opp.oppScore, score: ev.total });
+      candidates.push({ r, c, aiScore: ev.aiScore, oppScore: ev.oppScore, score: ev.total });
     }
   }
 
@@ -386,7 +410,7 @@ const AI = {
 const TT = new Map();
 
 function boardKey(board2D, playerToMove) {
-  s = playerToMove + "|";
+  let s = playerToMove + "|";
   for (let r = 0; r < BOARD_SIZE; r++) s += board2D[r].join("") + "/";
   return s;
 }
@@ -397,7 +421,7 @@ function getAxisStringOnBoard(board2D, r, c, dr, dc, player, opp) {
     const nr = r + dr * i;
     const nc = c + dc * i;
     if (!inBounds(nr, nc)) str += "B";
-    if (board2D[nr][nc] === player) str += "P";
+    else if (board2D[nr][nc] === player) str += "P";
     else if (board2D[nr][nc] === opp) str += "B";
     else str += ".";
   }
@@ -414,18 +438,19 @@ function evaluateCellOnBoard(board2D, r, c, side, opp) {
 }
 
 function hasNeighbor(board2D, r, c, dist) {
-  for (; dr <= dist; dr++) {
+  for (let dr = -dist; dr <= dist; dr++) {
     for (let dc = -dist; dc <= dist; dc++) {
-      if (dr === 0 && dc ===0) continue;
+      if (dr === 0 && dc === 0) continue;
       const nr = r + dr, nc = c + dc;
       if (!inBounds(nr, nc)) continue;
-      if[nr][nc] !== "") return true;
+      if (board2D[nr][nc] !== "") return true;
     }
   }
   return false;
 }
 
-function generateCandidates(board2D, side, opp) moves = [];
+function generateCandidates(board2D, side, opp) {
+  const moves = [];
   let hasAnyStone = false;
 
   for (let r = 0; r < BOARD_SIZE; r++) {
@@ -460,7 +485,7 @@ function evaluateBoardHeuristic(board2D, aiSide, oppSide) {
 
       board2D[r][c] = aiSide;
       let s1 = 0;
-      for (const [dr,dc] of dirs) s1 += evaluateLineStr(getAxisStringOnBoard r, c, dr, dc, aiSide, oppSide));
+      for (const [dr,dc] of dirs) s1 += evaluateLineStr(getAxisStringOnBoard(board2D, r, c, dr, dc, aiSide, oppSide));
       board2D[r][c] = "";
 
       board2D[r][c] = oppSide;
@@ -520,7 +545,7 @@ function alphaBeta(board2D, depth, alpha, beta, playerToMove, aiSide, oppSide, l
       opp,
       aiSide,
       oppSide,
-      { r: mv.r, c: mv.c, side },
+      { r: mv.r, c: mv.c, p: side },
       deadline
     );
 
@@ -554,7 +579,7 @@ function calculateLocalAIMoveExtreme(aiSide) {
   for (const mv of quick) {
     board2D[mv.r][mv.c] = aiSide;
     const win = checkWinOnBoard(board2D, mv.r, mv.c, aiSide);
-    board2D[mv.r.c] = "";
+    board2D[mv.r][mv.c] = "";
     if (win) return { r: mv.r, c: mv.c };
   }
   for (const mv of quick) {
@@ -579,7 +604,7 @@ function calculateLocalAIMoveExtreme(aiSide) {
 
     const rootCandidates = generateCandidates(board2D, aiSide, oppSide);
 
-   Candidates) {
+    for (const mv of rootCandidates) {
       if (performance.now() > deadline) { timedOut = true; break; }
 
       board2D[mv.r][mv.c] = aiSide;
@@ -626,7 +651,7 @@ function handleCellClick(e) {
   const c = parseInt(e.target.dataset.col, 10);
   if (State.board[r][c] !== "") return;
 
-  const mode = modeSelect.value;
+  const mode = modeSelect ? modeSelect.value : "pvp";
 
   if (mode === "online") {
     if (!State.currentRoomId) return;
@@ -651,7 +676,7 @@ function handleCellClick(e) {
       if (diff === "super") move = calculateLocalAIMoveExtreme("O");
       else move = calculateLocalAIMove(diff, "O");
 
-      applyMoveLocally(move.r, move.cO");
+      applyMoveLocally(move.r, move.c, "O");
       State.isAiThinking = false;
       updateUIState();
     }, 50);
@@ -671,6 +696,8 @@ function listenToAvailableRooms() {
 
   State.unsubscribeRooms = onSnapshot(q, (snapshot) => {
     const roomListEl = document.getElementById("availableRooms");
+    if (!roomListEl) return;
+    
     roomListEl.innerHTML = "";
 
     if (snapshot.empty) {
@@ -694,9 +721,12 @@ function listenToAvailableRooms() {
 }
 
 window.joinOrCreateRoom = async function () {
-db) return alert("Hệ thống Offline. Vui lòng kiểm tra mạng!");
+  if (!db) return alert("Hệ thống Offline. Vui lòng kiểm tra mạng!");
 
-  const roomIdInput = document.getElementById("roomIdInput").value.trim().toLowerCase();
+  const roomIdInputEl = document.getElementById("roomIdInput");
+  if(!roomIdInputEl) return;
+  const roomIdInput = roomIdInputEl.value.trim().toLowerCase();
+  
   if (!roomIdInput) return alert("Vui lòng nhập tên phòng!");
 
   const roomId = "room_" + roomIdInput;
@@ -719,8 +749,9 @@ db) return alert("Hệ thống Offline. Vui lòng kiểm tra mạng!");
 
       State.mySide = "X";
       State.currentRoomId = roomId;
-      roomStatus.innerHTML =
-        `Đã tạo: <span style="color:#2563eb; font-size:1.1rem">${roomIdInput}</span><br>Bạn là Quân X. Đang đợi...`;
+      if (roomStatus) {
+         roomStatus.innerHTML = `Đã tạo: <span style="color:#2563eb; font-size:1.1rem">${roomIdInput}</span><br>Bạn là Quân X. Đang đợi...`;
+      }
     } else {
       const data = snap.data();
 
@@ -735,8 +766,9 @@ db) return alert("Hệ thống Offline. Vui lòng kiểm tra mạng!");
 
       State.currentRoomId = roomId;
       State.currentResetSignal = data.resetSignal || 0;
-      roomStatus.innerHTML =
-        `Vào phòng: <span style="color:#2563eb; font-size:1.1rem">${roomIdInput}</span><br>Bạn là Quân ${State.mySide}`;
+      if (roomStatus) {
+         roomStatus.innerHTML = `Vào phòng: <span style="color:#2563eb; font-size:1.1rem">${roomIdInput}</span><br>Bạn là Quân ${State.mySide}`;
+      }
     }
 
     listenToRoom(roomRef);
@@ -755,8 +787,9 @@ function listenToRoom(roomRef) {
     const data = snap.data();
 
     if (data.playerX && data.playerO !== "") {
-      roomStatus.innerHTML =
-        `Đang thi đấu: <b>${State.currentRoomId.replace("room_", "")}</b><br>(Bạn là quân ${State.mySide})`;
+      if (roomStatus) {
+          roomStatus.innerHTML = `Đang thi đấu: <b>${State.currentRoomId.replace("room_", "")}</b><br>(Bạn là quân ${State.mySide})`;
+      }
     }
 
     if (data.resetSignal && data.resetSignal !== State.currentResetSignal) {
@@ -776,9 +809,11 @@ function listenToRoom(roomRef) {
           if (State.board[r][c] !== v) {
             State.board[r][c] = v;
             const cell = getCellElement(r, c);
-            cell.textContent = v;
-            cell.className = "cell";
-            if (v === "X" || v === "O") cell.classList.add(v.toLowerCase());
+            if (cell) {
+               cell.textContent = v;
+               cell.className = "cell";
+               if (v === "X" || v === "O") cell.classList.add(v.toLowerCase());
+            }
           }
         }
       }
@@ -787,9 +822,11 @@ function listenToRoom(roomRef) {
     if (typeof data.lastMoveIndex === "number" && data.lastMoveIndex !== -1) {
       const { r, c } = rcFromIndex(data.lastMoveIndex);
       const cell = getCellElement(r, c);
-      if (State.lastMoveElement) State.lastMoveElement.classList.remove("last-move");
-      cell.classList.add("last-move");
-      State.lastMoveElement = cell;
+      if (cell) {
+         if (State.lastMoveElement) State.lastMoveElement.classList.remove("last-move");
+         cell.classList.add("last-move");
+         State.lastMoveElement = cell;
+      }
     }
 
     State.currentPlayer = data.turn || "X";
@@ -815,15 +852,18 @@ function syncMoveToFirebase(row, col, playerJustMoved) {
    MODE CHANGE
 ======================= */
 window.handleModeChange = function () {
-  const mode = modeSelect.value;
+  const mode = modeSelect ? modeSelect.value : "pvp";
 
   if (mode === "online") {
-    onlinePanel.style.display = "block";
+    if (onlinePanel) onlinePanel.style.display = "block";
     window.initGame();
     listenToAvailableRooms();
   } else {
-    onlinePanel.style.display = "none";
-    if (State.unsubscribe { State.unsubscribeRooms(); State.unsubscribeRooms = null; }
+    if (onlinePanel) onlinePanel.style.display = "none";
+    if (State.unsubscribeRooms) { 
+       State.unsubscribeRooms(); 
+       State.unsubscribeRooms = null; 
+    }
     window.initGame();
   }
 };
@@ -832,8 +872,9 @@ window.handleModeChange = function () {
    REMATCH
 ======================= */
 window.triggerRematch = async function () {
-  if (modeSelect.value === "online" && State.currentRoomId) {
-    modalOverlay.classList.remove("active");
+  const mode = modeSelect ? modeSelect.value : "pvp";
+  if (mode === "online" && State.currentRoomId) {
+    if (modalOverlay) modalOverlay.classList.remove("active");
     const roomRef = doc(db, "rooms", State.currentRoomId);
     try {
       await updateDoc(roomRef, {
@@ -854,7 +895,7 @@ window.triggerRematch = async function () {
    UNDO (offline only)
 ======================= */
 window.undoMove = function () {
-  const mode = modeSelect.value;
+  const mode = modeSelect ? modeSelect.value : "pvp";
   if (State.moveHistory.length < 1 || State.isAiThinking || mode === "online") return;
 
   const steps = mode.startsWith("pve") ? 2 : 1;
@@ -863,16 +904,18 @@ window.undoMove = function () {
     if (State.moveHistory.length === 0) break;
     const last = State.moveHistory.pop();
     State.board[last.row][last.col] = "";
-    last.element.textContent = "";
-    last.element.className = "cell";
+    if (last.element) {
+        last.element.textContent = "";
+        last.element.className = "cell";
+    }
   }
 
   document.querySelectorAll(".win-cell").forEach(e => e.classList.remove("win-cell"));
-  modalOverlay.classList.remove("active");
+  if (modalOverlay) modalOverlay.classList.remove("active");
 
   if (State.moveHistory.length > 0) {
     State.lastMoveElement = State.moveHistory[State.moveHistory.length - 1].element;
-    State.lastMoveElement.classList.add("last-move");
+    if (State.lastMoveElement) State.lastMoveElement.classList.add("last-move");
   } else {
     State.lastMoveElement = null;
   }
@@ -892,7 +935,8 @@ window.handleFooterClick = function () {
   clearTimeout(cheatTimeout);
   cheatClicks++;
   if (cheatClicks >= 5) {
-    document.getElementById("cheatBtn").style.display = "block";
+    const cheatBtn = document.getElementById("cheatBtn");
+    if(cheatBtn) cheatBtn.style.display = "block";
     cheatClicks = 0;
   }
   cheatTimeout = setTimeout(() => { cheatClicks = 0; }, 2000);
@@ -901,10 +945,10 @@ window.handleFooterClick = function () {
 window.triggerCheat = function () {
   if (!State.gameActive || State.isAiThinking) return;
 
-  const mode = modeSelect.value;
+  const mode = modeSelect ? modeSelect.value : "pvp";
 
   if (mode === "online") {
-    if (!State.current || State.currentPlayer !== State.mySide) return;
+    if (!State.currentRoomId || State.currentPlayer !== State.mySide) return;
 
     State.isAiThinking = true;
     updateUIState();
@@ -931,7 +975,7 @@ window.triggerCheat = function () {
    MODAL + FULLSCREEN
 ======================= */
 window.closeModal = function () {
-  modalOverlay.classList.remove("active");
+  if(modalOverlay) modalOverlay.classList.remove("active");
 };
 
 window.enterFullScreen = function () {
@@ -944,5 +988,11 @@ window.exitFullScreen = function () {
   document.body.classList.remove("fullscreen-mode");
 };
 
-/* ==============START=======
-window.initGame();
+/* =======================
+   START 
+======================= */
+// Mặc định khởi tạo giao diện
+document.addEventListener("DOMContentLoaded", () => {
+   buildBoardDOM();
+   window.initGame();
+});
