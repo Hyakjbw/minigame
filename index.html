@@ -6,225 +6,139 @@
     <title>Cờ Caro</title>
     <style>
         :root {
-            --paper-bg: #fffdf2;
-            --line-blue: #c4def6;
-            --margin-red: #ffadad;
-            --text-main: #334155;
-            --x-color: #1e40af;
-            --o-color: #b91c1c;
-            --win-highlight: rgba(253, 224, 71, 0.7);
-            --last-move-marker: rgba(30, 64, 175, 0.15);
+            --paper-bg: #fffcf0;
+            --line-blue: #b9d8f3;
+            --margin-red: #ff9999;
+            --text-main: #1e293b;
+            --x-color: #2563eb; 
+            --o-color: #dc2626; 
+            --win-highlight: rgba(250, 204, 21, 0.7); 
+            --last-move-marker: rgba(37, 99, 235, 0.15);
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-tap-highlight-color: transparent; }
 
         body {
-            background-color: #e2e8f0;
+            background-color: #f1f5f9;
             color: var(--text-main);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
-            padding: 10px;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            display: flex; flex-direction: column; align-items: center;
+            min-height: 100vh; padding: 15px 10px;
         }
 
-        header {
-            width: 100%;
-            max-width: 700px;
-            text-align: center;
-            margin-bottom: 10px;
-            z-index: 10;
-        }
+        header { width: 100%; max-width: 650px; text-align: center; z-index: 10; }
 
-        h1 {
-            font-size: 1.6rem;
-            color: #475569;
-            margin-bottom: 10px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-top: 10px;
-        }
+        h1 { font-size: 1.8rem; color: #334155; margin-bottom: 15px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; }
 
         .controls {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 8px;
-            margin-bottom: 10px;
+            display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+            background: white; padding: 12px; border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-bottom: 15px;
         }
 
         select, .btn-action, input {
-            background: white;
-            color: var(--text-main);
-            border: 1px solid #cbd5e1;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 0.9rem;
-            cursor: pointer;
-            font-weight: 600;
-            transition: all 0.2s;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-            outline: none;
+            background: #f8fafc; color: var(--text-main); border: 1px solid #cbd5e1;
+            padding: 8px 14px; border-radius: 8px; font-size: 0.95rem;
+            cursor: pointer; font-weight: 600; transition: all 0.2s; outline: none;
         }
+        input { cursor: text; font-weight: normal; background: white; }
 
-        input { cursor: text; font-weight: normal; }
-
-        .btn-action:hover {
-            background: #f1f5f9;
-            border-color: #94a3b8;
-        }
-
+        .btn-action:hover { background: #e2e8f0; }
         .btn-reset { background: #475569 !important; color: white !important; border: none; }
         .btn-primary { background: #10b981 !important; color: white !important; border: none; }
 
         /* Panel Online */
         #onlinePanel {
-            display: none;
-            background: white;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            margin-bottom: 15px;
-            width: 100%;
-            max-width: 400px;
-            text-align: center;
+            display: none; background: white; padding: 15px 20px; border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08); margin-bottom: 15px; width: 100%; max-width: 450px;
             border: 2px dashed #94a3b8;
         }
-        .online-group { margin-top: 10px; display: flex; gap: 5px; justify-content: center;}
+        .online-group { margin-top: 12px; display: flex; gap: 8px; justify-content: center;}
 
-        .status-bar { margin-bottom: 10px; }
+        .status-bar { margin-bottom: 15px; }
 
         .turn-indicator {
-            padding: 5px 20px;
-            border-radius: 20px;
-            font-weight: bold;
-            font-size: 1rem;
-            background: white;
-            border: 1px solid #cbd5e1;
-            display: inline-block;
+            padding: 6px 25px; border-radius: 25px; font-weight: bold; font-size: 1.1rem;
+            background: white; border: 2px solid #cbd5e1; display: inline-block;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: 0.3s;
         }
 
         .scroll-area {
-            width: 100%;
-            max-width: 100vw;
-            overflow: auto;
-            -webkit-overflow-scrolling: touch;
-            padding: 10px;
-            text-align: center;
+            width: 100%; max-width: 100vw; overflow: auto; -webkit-overflow-scrolling: touch;
+            padding: 10px; text-align: center;
         }
 
         .board-wrapper {
-            position: relative;
-            background-color: var(--paper-bg);
-            padding: 25px 20px 25px 50px;
-            border-radius: 4px;
-            box-shadow: 2px 4px 12px rgba(0,0,0,0.15);
-            border: 1px solid #d1d5db;
-            display: inline-block; 
-            width: max-content; 
-            text-align: left;
+            position: relative; background-color: var(--paper-bg); padding: 25px 20px 25px 50px;
+            border-radius: 6px; box-shadow: 3px 6px 15px rgba(0,0,0,0.15);
+            border: 1px solid #d1d5db; display: inline-block; width: max-content; text-align: left;
         }
 
         .board-wrapper::before {
             content: ''; position: absolute; top: 0; left: 40px; bottom: 0;
-            width: 2px; background-color: var(--margin-red); z-index: 1;
+            width: 2px; background-color: var(--margin-red); z-index: 1; opacity: 0.7;
         }
 
         .board-container { position: relative; z-index: 2; }
 
         .board {
-            display: grid;
-            grid-template-columns: repeat(20, 30px);
-            grid-template-rows: repeat(20, 30px);
-            background-color: var(--line-blue);
-            gap: 1px; border: 1px solid var(--line-blue); width: max-content;
+            display: grid; grid-template-columns: repeat(20, 32px); grid-template-rows: repeat(20, 32px);
+            background-color: var(--line-blue); gap: 1px; border: 1px solid var(--line-blue); width: max-content;
         }
 
         .cell {
-            background-color: var(--paper-bg);
-            width: 30px; height: 30px;
+            background-color: var(--paper-bg); width: 32px; height: 32px;
             display: flex; justify-content: center; align-items: center;
-            font-size: 22px; font-weight: 700; cursor: pointer;
+            font-size: 24px; font-weight: bold; cursor: pointer;
             transition: background 0.1s; touch-action: manipulation;
         }
 
-        .cell:hover { background-color: #f8fafc; }
-        .cell.x { color: var(--x-color); font-family: 'Comic Sans MS', cursive, sans-serif; }
-        .cell.o { color: var(--o-color); font-family: 'Comic Sans MS', cursive, sans-serif; }
+        .cell:hover { background-color: #f1f5f9; }
+        .cell.x { color: var(--x-color); font-family: 'Comic Sans MS', 'Chalkboard SE', cursive, sans-serif; }
+        .cell.o { color: var(--o-color); font-family: 'Comic Sans MS', 'Chalkboard SE', cursive, sans-serif; }
         .cell.last-move { background-color: var(--last-move-marker); }
 
-        .cell.win-cell {
-            background-color: var(--win-highlight) !important;
-            animation: highlightIn 0.5s ease-out forwards;
-        }
+        .cell.win-cell { background-color: var(--win-highlight) !important; animation: highlightIn 0.5s forwards; }
 
-        @keyframes highlightIn {
-            from { opacity: 0.5; transform: scale(0.9); }
-            to { opacity: 1; transform: scale(1); }
-        }
+        @keyframes highlightIn { from { opacity: 0.5; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
 
-        /* Footer Tác Giả */
         footer {
-            margin-top: 20px;
-            font-size: 0.9rem;
-            color: #64748b;
-            font-weight: 600;
-            cursor: pointer;
-            padding: 10px;
-            user-select: none;
+            margin-top: 25px; font-size: 0.95rem; color: #64748b; font-weight: 600;
+            cursor: pointer; padding: 10px; user-select: none;
         }
 
-        /* Nút Cheat Ẩn */
         #cheatBtn {
-            display: none;
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: linear-gradient(45deg, #8b5cf6, #ec4899);
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 50px;
-            font-weight: bold;
-            box-shadow: 0 4px 15px rgba(236, 72, 153, 0.4);
-            cursor: pointer;
-            z-index: 1000;
+            display: none; position: fixed; bottom: 20px; right: 20px;
+            background: linear-gradient(135deg, #8b5cf6, #ec4899); color: white; border: none;
+            padding: 12px 25px; border-radius: 50px; font-weight: bold; font-size: 1rem;
+            box-shadow: 0 4px 15px rgba(236, 72, 153, 0.4); cursor: pointer; z-index: 1000;
             animation: pulse 2s infinite;
         }
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
-        }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
 
-        /* Modal */
+        /* Modal Chơi Lại */
         .modal-overlay {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0, 0, 0, 0.5); display: flex;
-            justify-content: center; align-items: center;
+            background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(3px);
+            display: flex; justify-content: center; align-items: center;
             opacity: 0; pointer-events: none; transition: 0.3s; z-index: 100;
         }
         .modal-overlay.active { opacity: 1; pointer-events: all; }
         .modal-content {
-            background: white; padding: 25px 35px; border-radius: 12px;
-            text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            background: white; padding: 30px 40px; border-radius: 16px;
+            text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.2);
             max-width: 90%; transform: scale(0.8); transition: 0.3s;
         }
         .modal-overlay.active .modal-content { transform: scale(1); }
-        .modal-title { font-size: 1.5rem; margin-bottom: 20px; color: var(--text-main); }
+        .modal-title { font-size: 1.8rem; margin-bottom: 25px; color: var(--text-main); font-weight: 800; }
+        
         .modal-btn {
-            background: #475569; color: white; border: none;
-            padding: 10px 20px; font-size: 1rem; border-radius: 6px;
-            cursor: pointer; font-weight: bold; transition: 0.2s;
+            background: #cbd5e1; color: var(--text-main); border: none;
+            padding: 12px 20px; font-size: 1.05rem; border-radius: 8px;
+            cursor: pointer; font-weight: bold; transition: 0.2s; margin: 0 5px;
         }
+        .modal-btn-primary { background: #3b82f6; color: white; }
+        .modal-btn-primary:hover { background: #2563eb; }
 
         body.fullscreen-mode { padding: 0; background: #cbd5e1; justify-content: flex-start; }
         body.fullscreen-mode header, body.fullscreen-mode footer { display: none; }
@@ -257,16 +171,13 @@
         </div>
 
         <div id="onlinePanel">
-            <div><b>Chơi Online qua mạng</b></div>
-            <div style="font-size: 0.85rem; color: #64748b;">(Tạo phòng rồi gửi ID cho bạn bè để cùng chơi)</div>
+            <div style="font-weight: 700; color: #1e293b; margin-bottom: 5px;">KẾT NỐI PHÒNG CHƠI</div>
+            <div style="font-size: 0.85rem; color: #64748b;">(Nhập chung 1 tên phòng để chơi cùng nhau)</div>
             <div class="online-group">
-                <button class="btn-action btn-primary" onclick="window.createRoom()">Tạo Phòng Mới</button>
+                <input type="text" id="roomIdInput" placeholder="Ví dụ: vip123" maxlength="15" style="flex: 1;">
+                <button class="btn-action btn-primary" onclick="window.joinOrCreateRoom()">Vào / Tạo Phòng</button>
             </div>
-            <div class="online-group">
-                <input type="text" id="roomIdInput" placeholder="Nhập ID phòng..." maxlength="6">
-                <button class="btn-action" onclick="window.joinRoom()">Vào Phòng</button>
-            </div>
-            <div id="roomStatus" style="margin-top: 10px; font-weight: bold; color: #ef4444;"></div>
+            <div id="roomStatus" style="margin-top: 12px; font-weight: 600; color: #3b82f6;"></div>
         </div>
 
         <div class="status-bar">
@@ -287,7 +198,8 @@
     <div class="modal-overlay" id="modalOverlay">
         <div class="modal-content">
             <h2 class="modal-title" id="modalMessage">Chiến Thắng!</h2>
-            <button class="modal-btn" onclick="window.closeModalAndReset()">Chơi ván mới</button>
+            <button class="modal-btn" id="btnModalClose" onclick="window.closeModal()">Xem bàn cờ</button>
+            <button class="modal-btn modal-btn-primary" id="btnModalRematch" onclick="window.triggerRematch()">Chơi ván mới</button>
         </div>
     </div>
 
@@ -297,36 +209,35 @@
 
     <button id="cheatBtn" onclick="window.triggerCheat()">🪄 Đánh Giúp (AI)</button>
 
-    <!-- Kịch bản Module tích hợp Firebase & Game Logic -->
+    <!-- Kịch bản Module tích hợp Firebase -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
-        // CẤU HÌNH FIREBASE CỦA BẠN ĐÃ ĐƯỢC CHÈN VÀO ĐÂY
-        const defaultFirebaseConfig = {
+        // CẤU HÌNH FIREBASE CỦA BẠN (Không dùng Auth nữa để tránh lỗi IP)
+        const firebaseConfig = {
             apiKey: "AIzaSyAVEiHOD1xTnlAFW3h-YjmQcHPsx4saaLo",
             authDomain: "cocaro-8be98.firebaseapp.com",
             projectId: "cocaro-8be98",
             storageBucket: "cocaro-8be98.firebasestorage.app",
             messagingSenderId: "620011719200",
-            appId: "1:620011719200:web:fe8f79429587d96ddb4a45",
-            measurementId: "G-ER2KTRHEVL"
+            appId: "1:620011719200:web:fe8f79429587d96ddb4a45"
         };
 
-        let app, auth, db, user;
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'github-caro-huy';
+        let app, db;
         
         try {
-            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : defaultFirebaseConfig;
             app = initializeApp(firebaseConfig);
-            auth = getAuth(app);
             db = getFirestore(app);
-            
-            signInAnonymously(auth).catch(err => console.log("Lỗi ẩn danh Firebase:", err));
-            onAuthStateChanged(auth, u => { user = u; });
         } catch (e) {
-            console.log("Lỗi cấu hình Firebase, chạy ở chế độ Offline (Local).", e);
+            console.log("Chạy ở chế độ Offline.", e);
+        }
+
+        // TẠO LOCAL ID (Khắc phục lỗi nhiều máy cùng IP bị Firebase chặn)
+        let myLocalUid = localStorage.getItem('caro_uid');
+        if (!myLocalUid) {
+            myLocalUid = 'user_' + Math.random().toString(36).substring(2, 10);
+            localStorage.setItem('caro_uid', myLocalUid);
         }
 
         // --- CÁC BIẾN CỦA GAME ---
@@ -346,20 +257,21 @@
         
         // Biến cho Online
         let currentRoomId = null;
-        let mySide = null; // 'X' hoặc 'O'
+        let mySide = null; 
         let unsubscribe = null;
+        let currentResetFlag = 0; // Dùng để đồng bộ nút Chơi Lại
 
         // Biến Cheat
         let cheatClicks = 0;
         let cheatTimeout;
 
-        // BẢNG ĐIỂM HEURISTIC GOMOKU (Bẫy)
+        // BẢNG ĐIỂM AI CỤC BỘ
         const WIN_SCORE = 100000000;
         const OPEN4_SCORE = 10000000;
         const CLOSED4_SCORE = 1000000;
-        const OPEN3_SCORE = 500000; // Khuyến khích tạo bẫy chéo 3-3
+        const OPEN3_SCORE = 500000; 
         const CLOSED3_SCORE = 10000;
-        const OPEN2_SCORE = 5000;   // Tạo tiền đề
+        const OPEN2_SCORE = 5000;   
 
         // --- HÀM KHỞI TẠO ---
         window.initGame = function(keepOnline = false) {
@@ -388,6 +300,7 @@
                 if (unsubscribe) { unsubscribe(); unsubscribe = null; }
                 currentRoomId = null;
                 mySide = null;
+                currentResetFlag = 0;
                 roomStatus.innerHTML = '';
             }
             updateUIState();
@@ -397,7 +310,6 @@
             if (modeSelect.value === 'online') {
                 onlinePanel.style.display = 'block';
                 window.initGame();
-                if(!user) roomStatus.innerHTML = "Đang kết nối Máy chủ, vui lòng đợi giây lát...";
             } else {
                 onlinePanel.style.display = 'none';
                 window.initGame();
@@ -408,25 +320,31 @@
             if (isAiThinking) {
                 turnIndicator.textContent = "Máy đang tính...";
                 turnIndicator.style.color = "#94a3b8";
+                turnIndicator.style.borderColor = "#94a3b8";
             } else {
                 if (modeSelect.value === 'pvp') {
                     turnIndicator.textContent = `Lượt đi: Người chơi ${currentPlayer}`;
                     turnIndicator.style.color = currentPlayer === 'X' ? 'var(--x-color)' : 'var(--o-color)';
+                    turnIndicator.style.borderColor = currentPlayer === 'X' ? 'var(--x-color)' : 'var(--o-color)';
                 } else if (modeSelect.value === 'online') {
                     if (currentRoomId) {
                         if (currentPlayer === mySide) {
                             turnIndicator.textContent = `Lượt đi: Bạn (${currentPlayer})`;
+                            turnIndicator.style.color = currentPlayer === 'X' ? 'var(--x-color)' : 'var(--o-color)';
                         } else {
                             turnIndicator.textContent = `Lượt đi: Đối thủ (${currentPlayer})`;
+                            turnIndicator.style.color = "#64748b";
                         }
-                        turnIndicator.style.color = currentPlayer === 'X' ? 'var(--x-color)' : 'var(--o-color)';
+                        turnIndicator.style.borderColor = currentPlayer === 'X' ? 'var(--x-color)' : 'var(--o-color)';
                     } else {
                         turnIndicator.textContent = "Chưa vào phòng";
                         turnIndicator.style.color = "#94a3b8";
+                        turnIndicator.style.borderColor = "#cbd5e1";
                     }
                 } else {
                     turnIndicator.textContent = currentPlayer === 'X' ? "Lượt đi: Bạn (X)" : "Lượt đi: Máy (O)";
                     turnIndicator.style.color = currentPlayer === 'X' ? 'var(--x-color)' : 'var(--o-color)';
+                    turnIndicator.style.borderColor = currentPlayer === 'X' ? 'var(--x-color)' : 'var(--o-color)';
                 }
             }
         }
@@ -438,23 +356,24 @@
             const col = parseInt(e.target.dataset.col);
             if (board[row][col] !== '') return;
 
-            // Xử lý Chơi Online
             if (modeSelect.value === 'online') {
-                if (!currentRoomId || currentPlayer !== mySide) return; // Không phải lượt của mình
+                if (!currentRoomId || currentPlayer !== mySide) return; // Không phải lượt
                 applyMoveLocally(row, col, mySide);
                 syncMoveToFirebase(row, col);
                 return;
             }
 
-            // Xử lý Local
             applyMoveLocally(row, col, currentPlayer);
 
             if (gameActive && modeSelect.value.startsWith('pve') && currentPlayer === 'O') {
                 isAiThinking = true;
                 updateUIState();
                 setTimeout(() => {
-                    executeAiMove(modeSelect.value.split('-')[1]);
-                }, 100);
+                    let move = calculateLocalAIMove(modeSelect.value.split('-')[1], 'O');
+                    applyMoveLocally(move.r, move.c, 'O');
+                    isAiThinking = false;
+                    updateUIState();
+                }, 50);
             }
         }
 
@@ -474,9 +393,9 @@
             if (winCells) {
                 highlightWinCells(winCells);
                 let msg = "";
-                if (modeSelect.value === 'online') msg = player === mySide ? "Bạn đã thắng!" : "Đối thủ đã thắng!";
-                else if (modeSelect.value === 'pvp') msg = `Người chơi ${player} thắng!`;
-                else msg = player === 'X' ? "Bạn đã thắng!" : "Máy đã thắng!";
+                if (modeSelect.value === 'online') msg = player === mySide ? "🎉 Bạn đã thắng!" : "🥲 Đối thủ đã thắng!";
+                else if (modeSelect.value === 'pvp') msg = `🎉 Người chơi ${player} thắng!`;
+                else msg = player === 'X' ? "🎉 Bạn đã thắng!" : "🤖 Máy đã thắng!";
                 
                 showModal(msg);
                 gameActive = false;
@@ -484,7 +403,7 @@
             }
 
             if (moveHistory.length === BOARD_SIZE * BOARD_SIZE) {
-                showModal("Hòa cờ!");
+                showModal("🤝 Hòa cờ!");
                 gameActive = false;
                 return;
             }
@@ -493,10 +412,116 @@
             updateUIState();
         }
 
-        // --- AI (MÁY) LOGIC ---
+        // --- HÀM AI CỤC BỘ (SẠCH - SIÊU KHÓ) ---
+        function calculateLocalAIMove(difficulty, aiSide) {
+            let oppSide = aiSide === 'X' ? 'O' : 'X';
+            let candidates = [];
+
+            // Giới hạn vùng tìm kiếm: Chỉ kiểm tra các ô trống nằm cạnh các ô đã đánh
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    if (board[r][c] === '') {
+                        let near = false;
+                        for (let i = -2; i <= 2; i++) {
+                            for (let j = -2; j <= 2; j++) {
+                                let nr = r+i, nc = c+j;
+                                if (nr>=0 && nr<BOARD_SIZE && nc>=0 && nc<BOARD_SIZE && board[nr][nc] !== '') {
+                                    near = true; break;
+                                }
+                            }
+                            if (near) break;
+                        }
+                        if (near) candidates.push({r, c});
+                    }
+                }
+            }
+
+            // Nếu bàn cờ trống trơn, đánh giữa
+            if (candidates.length === 0) return {r: Math.floor(BOARD_SIZE/2), c: Math.floor(BOARD_SIZE/2)};
+
+            // Ưu tiên 1: Có bắt buộc phải đỡ/thắng không?
+            let forcedMove = getForcedMove(aiSide, oppSide, candidates);
+            if (forcedMove) return forcedMove;
+
+            // Chấm điểm tất cả ô
+            candidates.forEach(m => m.score = evaluateCell(m.r, m.c, aiSide, oppSide));
+            candidates.sort((a, b) => b.score - a.score);
+
+            if (difficulty === 'easy') {
+                return candidates[Math.floor(Math.random() * Math.min(8, candidates.length))];
+            } else if (difficulty === 'medium') {
+                return candidates[Math.floor(Math.random() * Math.min(3, candidates.length))];
+            } else if (difficulty === 'hard') {
+                return candidates[0]; // Tham lam
+            } else {
+                // Minimax Alpha-Beta Depth 1 (Siêu Khó)
+                let topMoves = candidates.slice(0, Math.min(12, candidates.length));
+                let bestSuperScore = -Infinity;
+                let bestMove = topMoves[0];
+
+                for (let move of topMoves) {
+                    board[move.r][move.c] = aiSide; // Thử đánh
+                    let maxOppScore = -Infinity;
+                    
+                    // Đo lường phản kháng mạnh nhất của địch
+                    for (let tr = 0; tr < BOARD_SIZE; tr++) {
+                        for (let tc = 0; tc < BOARD_SIZE; tc++) {
+                            if (board[tr][tc] === '') {
+                                let oppScore = evaluateCell(tr, tc, oppSide, aiSide);
+                                if (oppScore > maxOppScore) maxOppScore = oppScore;
+                                if (oppScore >= WIN_SCORE) break; // Cắt tỉa
+                            }
+                        }
+                        if (maxOppScore >= WIN_SCORE) break;
+                    }
+                    
+                    board[move.r][move.c] = ''; // Hoàn lại
+                    let finalScore = move.score - (maxOppScore * 1.2);
+
+                    if (finalScore > bestSuperScore) {
+                        bestSuperScore = finalScore;
+                        bestMove = move;
+                    }
+                }
+                return bestMove;
+            }
+        }
+
+        function getForcedMove(aiSide, oppSide, candidates) {
+            let blockMove = null;
+            for (let move of candidates) {
+                // Thử đánh để xem có thắng ngay không
+                board[move.r][move.c] = aiSide;
+                if (checkWin(move.r, move.c, aiSide)) { board[move.r][move.c] = ''; return move; }
+                board[move.r][move.c] = '';
+
+                // Thử xem đối thủ có thắng ngay nếu đánh ô này không -> Chặn
+                board[move.r][move.c] = oppSide;
+                if (checkWin(move.r, move.c, oppSide)) { blockMove = move; }
+                board[move.r][move.c] = '';
+            }
+            return blockMove;
+        }
+
+        function evaluateCell(row, col, aiSide, oppSide) {
+            let score = 0;
+            const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
+            for (let [dr, dc] of directions) {
+                let ai = getLinePattern(row, col, dr, dc, aiSide);
+                let opp = getLinePattern(row, col, dr, dc, oppSide);
+                
+                let aiScore = getPatternScore(ai.count, ai.blocks);
+                let oppScore = getPatternScore(opp.count, opp.blocks);
+                
+                score += aiScore;
+                score += oppScore * 1.3; // Phòng thủ quan trọng hơn tấn công
+            }
+            return score;
+        }
+
         function getLinePattern(row, col, dRow, dCol, player) {
-            let count = 1; let blocks = 0; let r, c;
-            let space1 = 0, space2 = 0;
+            let count = 1; let blocks = 0; let space1 = 0, space2 = 0;
+            let r, c;
 
             r = row + dRow; c = col + dCol;
             while (r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE && board[r][c] === player) { count++; r += dRow; c += dCol; }
@@ -527,150 +552,60 @@
             return count;
         }
 
-        function evaluateCell(row, col, aiSide, oppSide) {
-            let score = 0;
-            const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
-            for (let [dr, dc] of directions) {
-                let ai = getLinePattern(row, col, dr, dc, aiSide);
-                let opp = getLinePattern(row, col, dr, dc, oppSide);
-                score += getPatternScore(ai.count, ai.blocks);
-                score += getPatternScore(opp.count, opp.blocks) * 1.5; // Chặn đòn nhỉnh hơn xây nhà
-            }
-            return score;
-        }
-
-        function executeAiMove(difficulty, aiSide = 'O') {
-            let oppSide = aiSide === 'X' ? 'O' : 'X';
-            let candidates = [];
-
-            for (let r = 0; r < BOARD_SIZE; r++) {
-                for (let c = 0; c < BOARD_SIZE; c++) {
-                    if (board[r][c] === '') {
-                        let near = false;
-                        for (let i = -2; i <= 2; i++) {
-                            for (let j = -2; j <= 2; j++) {
-                                let nr = r+i, nc = c+j;
-                                if (nr>=0 && nr<BOARD_SIZE && nc>=0 && nc<BOARD_SIZE && board[nr][nc] !== '') {
-                                    near = true; break;
-                                }
-                            }
-                            if (near) break;
-                        }
-                        if (near) candidates.push({r, c});
-                    }
-                }
-            }
-
-            if (candidates.length === 0) {
-                applyMoveLocally(Math.floor(BOARD_SIZE/2), Math.floor(BOARD_SIZE/2), aiSide);
-                isAiThinking = false;
-                return {r: Math.floor(BOARD_SIZE/2), c: Math.floor(BOARD_SIZE/2)};
-            }
-
-            candidates.forEach(m => m.score = evaluateCell(m.r, m.c, aiSide, oppSide));
-            candidates.sort((a, b) => b.score - a.score);
-
-            let bestMove;
-            if (difficulty === 'easy') {
-                bestMove = candidates[Math.floor(Math.random() * Math.min(10, candidates.length))];
-            } else if (difficulty === 'medium') {
-                bestMove = candidates[Math.floor(Math.random() * Math.min(4, candidates.length))];
-            } else if (difficulty === 'hard') {
-                bestMove = candidates[0]; // Greedy thuần
-            } else {
-                // Siêu Khó: Nhìn trước 1 nước (Minimax Depth 1)
-                let topMoves = candidates.slice(0, Math.min(15, candidates.length));
-                let bestSuperScore = -Infinity;
-                bestMove = topMoves[0];
-
-                for (let move of topMoves) {
-                    board[move.r][move.c] = aiSide;
-                    let maxOppScore = -Infinity;
-                    
-                    for (let tr = 0; tr < BOARD_SIZE; tr++) {
-                        for (let tc = 0; tc < BOARD_SIZE; tc++) {
-                            if (board[tr][tc] === '') {
-                                let oppScore = evaluateCell(tr, tc, oppSide, aiSide);
-                                if (oppScore > maxOppScore) maxOppScore = oppScore;
-                                if (oppScore >= WIN_SCORE) break;
-                            }
-                        }
-                        if (maxOppScore >= WIN_SCORE) break;
-                    }
-                    
-                    board[move.r][move.c] = '';
-                    let finalScore = move.score - (maxOppScore * 1.2);
-
-                    if (finalScore > bestSuperScore) {
-                        bestSuperScore = finalScore;
-                        bestMove = move;
-                    }
-                }
-            }
-
-            applyMoveLocally(bestMove.r, bestMove.c, aiSide);
-            isAiThinking = false;
-            return bestMove; // Trả về nước đi cho Cheat Online
-        }
-
-        // --- CHỨC NĂNG ONLINE (FIREBASE) ---
-        window.createRoom = async function() {
-            if(!user) return alert("Chưa thể kết nối tới Máy chủ. Vui lòng F5 lại trang!");
-            window.initGame(true);
-            currentRoomId = Math.random().toString(36).substring(2, 8).toUpperCase();
-            mySide = 'X';
+        // --- CHỨC NĂNG ONLINE (FIREBASE TỐI ƯU CHO CHƠI LẠI VÀ CHUNG MẠNG) ---
+        window.joinOrCreateRoom = async function() {
+            if(!db) return alert("Firebase chưa khởi tạo. Vui lòng chạy trên môi trường có mạng!");
+            let roomIdInput = document.getElementById('roomIdInput').value.trim().toLowerCase();
+            if (!roomIdInput) return alert("Vui lòng nhập tên phòng! (Ví dụ: huy123)");
             
-            try {
-                // Sử dụng đường dẫn cơ bản cho Firebase tự do
-                const roomRef = doc(db, 'rooms', currentRoomId);
-                await setDoc(roomRef, {
-                    board1D: Array(BOARD_SIZE * BOARD_SIZE).fill(''),
-                    turn: 'X',
-                    lastMoveIndex: -1,
-                    playerX: user.uid,
-                    playerO: null,
-                    created: Date.now()
-                });
-                
-                roomStatus.innerHTML = `ID Phòng: <span style="color:#1e40af; font-size:1.2rem">${currentRoomId}</span><br>Đang chờ đối thủ...`;
-                listenToRoom(roomRef);
-            } catch (e) {
-                console.error(e);
-                roomStatus.innerHTML = "Lỗi tạo phòng! Kiểm tra lại Firebase Firestore Rules.";
-                alert("Lỗi: Bạn cần vào Firebase > Firestore Database > Rules và chỉnh sửa thành: allow read, write: if true;");
-            }
-        };
-
-        window.joinRoom = async function() {
-            if(!user) return alert("Chưa thể kết nối tới Máy chủ. Vui lòng F5 lại trang!");
-            const roomId = document.getElementById('roomIdInput').value.trim().toUpperCase();
-            if (!roomId) return alert("Vui lòng nhập ID phòng");
-
+            const roomId = "room_" + roomIdInput; // Tránh trùng lặp collection gốc
             window.initGame(true);
             const roomRef = doc(db, 'rooms', roomId);
             
             try {
                 const roomSnap = await getDoc(roomRef);
                 if (!roomSnap.exists()) {
-                    roomStatus.innerHTML = "Phòng không tồn tại!";
-                    return;
-                }
-                const data = roomSnap.data();
-                if (data.playerO && data.playerO !== user.uid && data.playerX !== user.uid) {
-                    roomStatus.innerHTML = "Phòng đã đầy!";
-                    return;
-                }
+                    // TẠO PHÒNG (Người vào đầu tiên)
+                    await setDoc(roomRef, {
+                        board1D: Array(BOARD_SIZE * BOARD_SIZE).fill(''),
+                        turn: 'X',
+                        lastMoveIndex: -1,
+                        playerX: myLocalUid,
+                        playerO: null,
+                        resetFlag: 0
+                    });
+                    mySide = 'X';
+                    currentRoomId = roomId;
+                    roomStatus.innerHTML = `Đã tạo phòng: <span style="color:#2563eb; font-size:1.1rem">${roomIdInput}</span><br>Bạn là Quân X (Đi trước). Chờ đối thủ...`;
+                } else {
+                    // VÀO PHÒNG (Người vào sau)
+                    const data = roomSnap.data();
+                    
+                    // Nếu mình đã ở trong phòng này rồi (Vào lại)
+                    if (data.playerX === myLocalUid) {
+                        mySide = 'X';
+                    } else if (data.playerO === myLocalUid) {
+                        mySide = 'O';
+                    } 
+                    // Nếu phòng còn trống ghế O
+                    else if (!data.playerO) {
+                        await updateDoc(roomRef, { playerO: myLocalUid });
+                        mySide = 'O';
+                    } 
+                    // Phòng đã có 2 người khác
+                    else {
+                        return alert("Phòng này đã đủ 2 người đang chơi!");
+                    }
 
-                currentRoomId = roomId;
-                mySide = data.playerX === user.uid ? 'X' : 'O';
+                    currentRoomId = roomId;
+                    roomStatus.innerHTML = `Đã vào phòng: <span style="color:#2563eb; font-size:1.1rem">${roomIdInput}</span><br>Bạn là Quân ${mySide}`;
+                }
                 
-                if (!data.playerO && data.playerX !== user.uid) {
-                    await updateDoc(roomRef, { playerO: user.uid });
-                }
-
-                roomStatus.innerHTML = `Đã vào phòng: <span style="color:#1e40af;">${roomId}</span><br>Bạn là quân: ${mySide}`;
                 listenToRoom(roomRef);
-            } catch(e) { console.error(e); }
+            } catch(e) { 
+                console.error(e); 
+                alert("Lỗi truy cập dữ liệu! Đảm bảo Firebase Rules của bạn là: allow read, write: if true;");
+            }
         };
 
         function listenToRoom(roomRef) {
@@ -680,17 +615,40 @@
                 const data = doc.data();
                 
                 if (data.playerX && data.playerO) {
-                    roomStatus.innerHTML = `Đang chơi trong phòng: ${currentRoomId} (Bạn là ${mySide})`;
+                    roomStatus.innerHTML = `Đang chơi: <b>${currentRoomId.replace('room_','')}</b> (Bạn là quân ${mySide})`;
                 }
 
-                // Cập nhật bàn cờ từ Firebase nếu người kia đánh
-                if (data.turn !== currentPlayer) {
+                // Xử lý logic Reset (Chơi lại)
+                if (data.resetFlag > currentResetFlag) {
+                    currentResetFlag = data.resetFlag;
+                    // Dọn dẹp local board
+                    boardElement.innerHTML = '';
+                    board = Array.from({ length: BOARD_SIZE }, () => Array(BOARD_SIZE).fill(''));
+                    moveHistory = [];
+                    for (let i = 0; i < BOARD_SIZE; i++) {
+                        for (let j = 0; j < BOARD_SIZE; j++) {
+                            const cell = document.createElement('div');
+                            cell.className = 'cell';
+                            cell.dataset.row = i;
+                            cell.dataset.col = j;
+                            cell.addEventListener('click', handleCellClick);
+                            boardElement.appendChild(cell);
+                        }
+                    }
+                    currentPlayer = 'X';
+                    gameActive = true;
+                    lastMoveElement = null;
+                    document.getElementById('modalOverlay').classList.remove('active');
+                    updateUIState();
+                } 
+                else if (data.turn !== currentPlayer && gameActive) {
+                    // Nhận nước cờ từ đối thủ
                     const lMove = data.lastMoveIndex;
                     if (lMove !== -1) {
                         const r = Math.floor(lMove / BOARD_SIZE);
                         const c = lMove % BOARD_SIZE;
-                        if (board[r][c] === '') { // Đảm bảo chưa đánh trên local
-                            applyMoveLocally(r, c, currentPlayer); // Đánh cho đối thủ
+                        if (board[r][c] === '') { 
+                            applyMoveLocally(r, c, currentPlayer); 
                         }
                     }
                 }
@@ -701,17 +659,31 @@
             const roomRef = doc(db, 'rooms', currentRoomId);
             const index = row * BOARD_SIZE + col;
             try {
-                // Chuyển mảng 2D thành 1D
-                const board1D = board.flat();
                 await updateDoc(roomRef, {
-                    board1D: board1D,
-                    turn: currentPlayer, // Đã bị đổi ở applyMoveLocally
+                    turn: currentPlayer, 
                     lastMoveIndex: index
                 });
             } catch(e) { console.error("Lỗi đồng bộ", e); }
         }
 
-        // --- CHỨC NĂNG ẨN (CHEAT) ---
+        // Kích hoạt khi bấm nút "Chơi ván mới" trong phòng Online
+        window.triggerRematch = async function() {
+            if (modeSelect.value === 'online' && currentRoomId) {
+                const roomRef = doc(db, 'rooms', currentRoomId);
+                try {
+                    currentResetFlag++;
+                    await updateDoc(roomRef, {
+                        turn: 'X', 
+                        lastMoveIndex: -1,
+                        resetFlag: currentResetFlag
+                    });
+                } catch(e) { console.error("Lỗi tạo lại ván", e); }
+            } else {
+                window.initGame();
+            }
+        };
+
+        // --- CHỨC NĂNG ẨN (CHEAT - HUY) ---
         window.handleFooterClick = function() {
             clearTimeout(cheatTimeout);
             cheatClicks++;
@@ -727,10 +699,24 @@
             
             if (modeSelect.value === 'online') {
                 if (!currentRoomId || currentPlayer !== mySide) return;
-                let move = executeAiMove('super', mySide); // Gọi AI đánh hộ
-                syncMoveToFirebase(move.r, move.c);
+                isAiThinking = true;
+                updateUIState();
+                setTimeout(() => {
+                    let move = calculateLocalAIMove('super', mySide);
+                    applyMoveLocally(move.r, move.c, mySide);
+                    syncMoveToFirebase(move.r, move.c);
+                    isAiThinking = false;
+                    updateUIState();
+                }, 50);
             } else {
-                executeAiMove('super', currentPlayer); // Chơi offline
+                isAiThinking = true;
+                updateUIState();
+                setTimeout(() => {
+                    let move = calculateLocalAIMove('super', currentPlayer);
+                    applyMoveLocally(move.r, move.c, currentPlayer);
+                    isAiThinking = false;
+                    updateUIState();
+                }, 50);
             }
         };
 
@@ -756,7 +742,7 @@
         }
 
         window.undoMove = function() {
-            if (moveHistory.length < 1 || isAiThinking || modeSelect.value === 'online') return; // Không cho undo khi đánh online
+            if (moveHistory.length < 1 || isAiThinking || modeSelect.value === 'online') return; 
             const steps = modeSelect.value.startsWith('pve') ? 2 : 1;
             for (let i = 0; i < steps; i++) {
                 if (moveHistory.length === 0) break;
@@ -778,7 +764,7 @@
 
         function getCellElement(r, c) { return boardElement.querySelector(`[data-row="${r}"][data-col="${c}"]`); }
         function showModal(msg) { document.getElementById('modalMessage').textContent = msg; document.getElementById('modalOverlay').classList.add('active'); }
-        window.closeModalAndReset = function() { window.initGame(true); }
+        window.closeModal = function() { document.getElementById('modalOverlay').classList.remove('active'); }
 
         window.enterFullScreen = function() {
             const el = document.documentElement;
