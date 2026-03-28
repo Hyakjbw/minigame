@@ -623,7 +623,7 @@ window.undoMove = function () {
 ======================= */
 let cheatClicks = 0;
 let cheatTimeout = null;
-const CLICKS_TO_SHOW = 5;
+const CLICKS_TO_SHOW = 3;
 const CLICKS_TO_HIDE = 2;
 
 window.handleFooterClick = function () {
