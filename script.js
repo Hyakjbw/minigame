@@ -263,19 +263,18 @@ function applyMoveLocally(r, c, player) {
 /* =======================
    AI (MASTER PATTERN HEURISTIC)
 ======================= */
-// Các mẫu nhận diện cờ Caro chuyên nghiệp. P=Quân cờ, .=Trống, B=Bị chặn
 const PATTERNS = [
-  { re: /PPPPP/, score: 100000000 }, // Thắng luôn
-  { re: /\.PPPP\./, score: 10000000 }, // 4 hở 2 đầu (Win 100%)
-  { re: /BPPPP\./, score: 1000000 }, // 4 chặn 1 đầu
+  { re: /PPPPP/, score: 100000000 }, 
+  { re: /\.PPPP\./, score: 10000000 }, 
+  { re: /BPPPP\./, score: 1000000 }, 
   { re: /\.PPPPB/, score: 1000000 }, 
-  { re: /P\.PPP/, score: 1000000 }, // 4 có khoảng trống
+  { re: /P\.PPP/, score: 1000000 }, 
   { re: /PPP\.P/, score: 1000000 },
   { re: /PP\.PP/, score: 1000000 },
-  { re: /\.PPP\./, score: 100000 }, // 3 hở 2 đầu
-  { re: /\.P\.PP\./, score: 80000 }, // 3 hở có khoảng trống
+  { re: /\.PPP\./, score: 100000 }, 
+  { re: /\.P\.PP\./, score: 80000 }, 
   { re: /\.PP\.P\./, score: 80000 },
-  { re: /BPPP\.\./, score: 10000 }, // 3 chặn 1 đầu
+  { re: /BPPP\.\./, score: 10000 }, 
   { re: /\.\.PPPB/, score: 10000 },
   { re: /BPP\.P\./, score: 8000 },
   { re: /\.P\.PPB/, score: 8000 },
@@ -284,29 +283,27 @@ const PATTERNS = [
   { re: /P\.\.PP/, score: 5000 },
   { re: /PP\.\.P/, score: 5000 },
   { re: /P\.P\.P/, score: 5000 },
-  { re: /\.PP\./, score: 1000 }, // 2 hở 2 đầu
+  { re: /\.PP\./, score: 1000 }, 
   { re: /\.P\.P\./, score: 800 },
   { re: /\.\.PP\.\./, score: 600 },
-  { re: /BPP\.\.\./, score: 100 }, // 2 chặn 1 đầu
+  { re: /BPP\.\.\./, score: 100 }, 
   { re: /\.\.\.PPB/, score: 100 }
 ];
 
-// Lấy chuỗi ký tự độ dài 9 quanh 1 điểm để quét Pattern
 function getAxisString(r, c, dr, dc, player) {
   let str = "";
   for (let i = -4; i <= 4; i++) {
     const nr = r + dr * i, nc = c + dc * i;
-    if (!inBounds(nr, nc)) str += "B"; // Vượt ranh giới là Bị Chặn
+    if (!inBounds(nr, nc)) str += "B";
     else if (State.board[nr][nc] === player) str += "P";
     else if (State.board[nr][nc] === "") str += ".";
-    else str += "B"; // Quân đối phương là Bị Chặn
+    else str += "B";
   }
   return str;
 }
 
-// Chấm điểm 1 ô cờ (Có tính toán đọc Bẫy/Combo)
 function evaluateCellMaster(r, c, player) {
-  State.board[r][c] = player; // Đặt thử cờ
+  State.board[r][c] = player; 
   let score = 0;
   let open3Count = 0;
   let closed4Count = 0;
@@ -316,7 +313,6 @@ function evaluateCellMaster(r, c, player) {
     const str = getAxisString(r, c, dr, dc, player);
     let lineScore = 0;
     
-    // Tìm mẫu khớp điểm cao nhất
     for (let i = 0; i < PATTERNS.length; i++) {
       if (PATTERNS[i].re.test(str)) {
         lineScore = PATTERNS[i].score;
@@ -325,16 +321,14 @@ function evaluateCellMaster(r, c, player) {
     }
     score += lineScore;
 
-    // Đếm số lượng đường 3 hở và 4 bị chặn để bắt bẫy
     if (lineScore === 100000 || lineScore === 80000) open3Count++;
     if (lineScore === 1000000) closed4Count++;
   }
-  State.board[r][c] = ""; // Rút cờ ra
+  State.board[r][c] = ""; 
 
-  // XỬ LÝ COMBO (Bẫy chết người)
-  if (closed4Count >= 2) score += 10000000; // Bẫy Double-4 (Không thể đỡ)
-  if (closed4Count >= 1 && open3Count >= 1) score += 5000000; // Bẫy 4-3 (Buộc chặn 4, để hở 3 -> Thắng)
-  if (open3Count >= 2) score += 2000000; // Bẫy Double-3 (Rất nguy hiểm)
+  if (closed4Count >= 2) score += 10000000;
+  if (closed4Count >= 1 && open3Count >= 1) score += 5000000;
+  if (open3Count >= 2) score += 2000000;
 
   return score;
 }
@@ -351,7 +345,6 @@ function calculateLocalAIMove(difficulty, aiSide) {
         continue;
       }
 
-      // Tối ưu: Chỉ quét các ô cách quân cờ khác bán kính 2 ô
       let isNearPiece = false;
       for (let i = -2; i <= 2 && !isNearPiece; i++) {
         for (let j = -2; j <= 2; j++) {
@@ -361,12 +354,8 @@ function calculateLocalAIMove(difficulty, aiSide) {
       }
       if (!isNearPiece) continue;
 
-      // Điểm Tấn công (Lợi ích nếu AI đi) và Điểm Phòng thủ (Hậu quả nếu Đối thủ đi)
       let attackScore = evaluateCellMaster(r, c, aiSide);
       let defenseScore = evaluateCellMaster(r, c, oppSide);
-      
-      // Cộng thêm 1 xíu điểm ưu tiên Tấn công (1.05) để AI chủ động dồn ép thay vì nhút nhát phòng ngự
-      // Cộng thêm điểm ưu tiên đánh gần trung tâm bàn cờ để tạo thế tốt đầu game
       let centerBias = 20 - (Math.abs(r - BOARD_SIZE/2) + Math.abs(c - BOARD_SIZE/2));
       let totalScore = (attackScore * 1.05) + defenseScore + centerBias;
 
@@ -378,13 +367,11 @@ function calculateLocalAIMove(difficulty, aiSide) {
     return { r: Math.floor(BOARD_SIZE / 2), c: Math.floor(BOARD_SIZE / 2) };
   }
 
-  // Sắp xếp nước cờ theo thứ tự giảm dần
   candidates.sort((a, b) => b.score - a.score);
 
   if (difficulty === "easy") return candidates[Math.floor(Math.random() * Math.min(6, candidates.length))];
   if (difficulty === "medium") return candidates[Math.floor(Math.random() * Math.min(2, candidates.length))];
   
-  // Hard/Super: Nước cờ tối ưu tuyệt đối
   return candidates[0];
 }
 
@@ -423,6 +410,17 @@ function handleCellClick(e) {
     }, 50);
   }
 }
+
+/* =======================
+   XÓA SLOT KHI OUT GAME (Tự động rời phòng)
+======================= */
+window.addEventListener("beforeunload", () => {
+  if (modeSelect && modeSelect.value === "online" && State.currentRoomId && State.mySide) {
+    const roomRef = doc(db, "rooms", State.currentRoomId);
+    if(State.mySide === "X") updateDoc(roomRef, { playerX: "" }).catch(()=>{});
+    if(State.mySide === "O") updateDoc(roomRef, { playerO: "" }).catch(()=>{});
+  }
+});
 
 /* =======================
    ONLINE
@@ -465,6 +463,7 @@ window.joinOrCreateRoom = async function () {
   const roomId = "room_" + roomIdInput;
   window.initGame(true);
   const roomRef = doc(db, "rooms", roomId);
+  const now = Date.now();
 
   try {
     const snap = await getDoc(roomRef);
@@ -475,19 +474,47 @@ window.joinOrCreateRoom = async function () {
         lastMoveIndex: -1,
         playerX: myLocalUid,
         playerO: "",
-        resetSignal: Date.now()
+        resetSignal: now,
+        lastActive: now
       });
       State.mySide = "X";
       State.currentRoomId = roomId;
       if (roomStatus) roomStatus.innerHTML = `Đã tạo: <span style="color:#2563eb; font-size:1.1rem">${roomIdInput}</span><br>Bạn là Quân X. Đang đợi...`;
     } else {
       const data = snap.data();
-      if (data.playerX === myLocalUid) State.mySide = "X";
-      else if (data.playerO === myLocalUid) State.mySide = "O";
-      else if (data.playerO === "") {
-        await updateDoc(roomRef, { playerO: myLocalUid });
-        State.mySide = "O";
-      } else return alert("Phòng đã đủ 2 người!");
+      let pX = data.playerX;
+      let pO = data.playerO;
+
+      // Xóa người chơi nếu phòng không có ai động vào > 30 phút
+      if (!data.lastActive || (now - data.lastActive > 30 * 60 * 1000)) {
+         pX = ""; pO = "";
+      }
+
+      // NẾU CẢ 2 SLOT ĐỀU TRỐNG (Hoặc do out game, hoặc do hết hạn) -> RESET BÀN CỜ LUÔN!
+      if (pX === "" && pO === "") {
+         await updateDoc(roomRef, {
+            board1D: Array(BOARD_SIZE * BOARD_SIZE).fill(""),
+            turn: "X",
+            lastMoveIndex: -1,
+            playerX: myLocalUid,
+            playerO: "",
+            resetSignal: now,
+            lastActive: now
+         });
+         State.mySide = "X";
+      } else {
+        // Vào tiếp nếu còn slot
+        if (pX === myLocalUid) State.mySide = "X";
+        else if (pO === myLocalUid) State.mySide = "O";
+        else if (pX === "") {
+          await updateDoc(roomRef, { playerX: myLocalUid, lastActive: now });
+          State.mySide = "X";
+        }
+        else if (pO === "") {
+          await updateDoc(roomRef, { playerO: myLocalUid, lastActive: now });
+          State.mySide = "O";
+        } else return alert("Phòng đã đủ 2 người đang chơi!");
+      }
 
       State.currentRoomId = roomId;
       State.currentResetSignal = data.resetSignal || 0;
@@ -555,7 +582,8 @@ function syncMoveToFirebase(row, col, playerJustMoved) {
   updateDoc(roomRef, {
     board1D: flattenBoard2D(State.board),
     turn: turnNext,
-    lastMoveIndex
+    lastMoveIndex,
+    lastActive: Date.now()
   }).catch(e => console.error("Lỗi đồng bộ", e));
 }
 
@@ -583,8 +611,9 @@ window.triggerRematch = async function () {
   if (mode === "online" && State.currentRoomId) {
     if (modalOverlay) modalOverlay.classList.remove("active");
     const roomRef = doc(db, "rooms", State.currentRoomId);
+    const now = Date.now();
     try {
-      await updateDoc(roomRef, { board1D: Array(BOARD_SIZE * BOARD_SIZE).fill(""), turn: "X", lastMoveIndex: -1, resetSignal: Date.now() });
+      await updateDoc(roomRef, { board1D: Array(BOARD_SIZE * BOARD_SIZE).fill(""), turn: "X", lastMoveIndex: -1, resetSignal: now, lastActive: now });
     } catch (e) {
       console.error("Lỗi yêu cầu ván mới", e);
     }
@@ -619,24 +648,53 @@ window.undoMove = function () {
 };
 
 /* =======================
-   CHEAT (5 chạm để Hiện, 2 chạm để Ẩn)
+   CHEAT (5 CHẠM TẠI DÒNG THÔNG BÁO)
 ======================= */
 let cheatClicks = 0;
 let cheatTimeout = null;
-const CLICKS_TO_SHOW = 3;
+const CLICKS_TO_SHOW = 5;
 const CLICKS_TO_HIDE = 2;
 
-window.handleFooterClick = function () {
+// Tự tạo nút (phòng trường hợp HTML thiếu nút ID="cheatBtn")
+function createCheatButtonIfNeeded() {
+  let btn = document.getElementById("cheatBtn");
+  if (!btn) {
+    btn = document.createElement("button");
+    btn.id = "cheatBtn";
+    btn.innerHTML = "🤖 Đánh Giúp";
+    btn.style.position = "fixed";
+    btn.style.bottom = "20px";
+    btn.style.right = "20px";
+    btn.style.zIndex = "9999";
+    btn.style.padding = "10px 15px";
+    btn.style.backgroundColor = "#ef4444";
+    btn.style.color = "white";
+    btn.style.border = "none";
+    btn.style.borderRadius = "8px";
+    btn.style.fontWeight = "bold";
+    btn.style.cursor = "pointer";
+    btn.style.boxShadow = "0 4px 6px rgba(0,0,0,0.1)";
+    btn.style.display = "none";
+    btn.onclick = window.triggerCheat;
+    document.body.appendChild(btn);
+  }
+  return btn;
+}
+
+window.handleCheatClick = function () {
   clearTimeout(cheatTimeout);
   cheatClicks++;
+  
+  // Nới lỏng thời gian lên 1 giây để dễ ấn đủ 5 lần hơn
   cheatTimeout = setTimeout(() => {
-    const cheatBtn = document.getElementById("cheatBtn");
-    if (cheatBtn) {
-      if (cheatClicks === CLICKS_TO_SHOW) cheatBtn.style.display = "block";
-      else if (cheatClicks === CLICKS_TO_HIDE) cheatBtn.style.display = "none";
+    const btn = createCheatButtonIfNeeded();
+    if (cheatClicks === CLICKS_TO_SHOW) {
+       btn.style.display = "block";
+    } else if (cheatClicks === CLICKS_TO_HIDE) {
+       btn.style.display = "none";
     }
     cheatClicks = 0;
-  }, 600);
+  }, 1000); 
 };
 
 window.triggerCheat = function () {
@@ -651,8 +709,11 @@ window.triggerCheat = function () {
       const move = calculateLocalAIMove("hard", State.mySide);
       const ok = applyMoveLocally(move.r, move.c, State.mySide);
       if (ok) syncMoveToFirebase(move.r, move.c, State.mySide);
-      State.isAiThinking = false;
-      updateUIState();
+      State.isAiThinking = true; // Dừng xíu cho mượt
+      setTimeout(()=>{
+         State.isAiThinking = false;
+         updateUIState();
+      }, 300);
     }, 50);
   } else {
     State.isAiThinking = true;
@@ -686,4 +747,11 @@ window.exitFullScreen = function () {
 document.addEventListener("DOMContentLoaded", () => {
    buildBoardDOM();
    window.initGame();
+   
+   // Tự động GẮN SỰ KIỆN CLICK VÀO CHỮ "LƯỢT ĐI" ĐỂ HIỆN NÚT CHEAT 
+   // (Bạn hãy nhấp chuột liên tục 5 lần vào chữ Lượt đi (TurnIndicator) nhé)
+   if (turnIndicator) {
+      turnIndicator.addEventListener("click", window.handleCheatClick);
+      turnIndicator.style.cursor = "pointer"; // Thay con trỏ chuột báo hiệu có thể click
+   }
 });
