@@ -944,5 +944,5 @@ window.exitFullScreen = function () {
   document.body.classList.remove("fullscreen-mode");
 };
 
-/* =======================
-   START=======window.initGame();
+/* ==============START=======
+window.initGame();
