@@ -79,11 +79,14 @@ function injectOnlineUI() {
   const style = document.createElement("style");
   style.innerHTML = `
       #inGameUI { display: none; justify-content: center; gap: 10px; margin-top: 15px; width: 100%; transition: 0.3s; }
-      .chat-panel { display: none; position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%); width: 320px; background: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); z-index: 1000; flex-direction: column; overflow: hidden; border: 1px solid #cbd5e1; }
-      .chat-messages { height: 200px; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; background: #f8fafc; scroll-behavior: smooth; }
-      .emote-row { display: flex; gap: 15px; padding: 10px; background: #e2e8f0; justify-content: center; font-size: 1.8rem; }
-      .emote-btn { cursor: pointer; transition: transform 0.2s; user-select: none; }
+      .chat-panel { display: none; position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%); width: 340px; background: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); z-index: 1000; flex-direction: column; overflow: hidden; border: 1px solid #cbd5e1; }
+      .chat-messages { height: 220px; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; background: #f8fafc; scroll-behavior: smooth; }
+      
+      /* Cập nhật khu vực chứa Emote để tự xuống dòng, có thanh cuộn nếu quá nhiều */
+      .emote-row { display: flex; flex-wrap: wrap; gap: 10px; padding: 10px; background: #e2e8f0; justify-content: center; font-size: 1.5rem; max-height: 95px; overflow-y: auto; }
+      .emote-btn { cursor: pointer; transition: transform 0.2s; user-select: none; padding: 2px; }
       .emote-btn:hover { transform: scale(1.3); }
+      
       .chat-msg { max-width: 85%; padding: 8px 12px; border-radius: 15px; font-size: 0.95rem; word-wrap: break-word; font-weight: 500;}
       .chat-mine { background: #bfdbfe; color: #1e3a8a; align-self: flex-end; border-bottom-right-radius: 2px; }
       .chat-theirs { background: #e2e8f0; color: #334155; align-self: flex-start; border-bottom-left-radius: 2px; }
@@ -106,6 +109,10 @@ function injectOnlineUI() {
   `;
   document.querySelector("header").appendChild(inGameUI);
 
+  // Sinh HTML cho kho Emote tự động
+  const emotes = ['🤣','😡','😢','🏳️','👏','👍','👎','🤔','😎','😭','🤬','🤯','💩','👻','🤡','❤️','🔥','😴'];
+  const emotesHTML = emotes.map(e => `<span class="emote-btn" onclick="window.sendChat('${e}')">${e}</span>`).join('');
+
   // Chat Panel
   const chatPanel = document.createElement("div");
   chatPanel.id = "chatPanel";
@@ -117,11 +124,7 @@ function injectOnlineUI() {
       </div>
       <div id="chatMessages" class="chat-messages"></div>
       <div class="emote-row">
-          <span class="emote-btn" onclick="window.sendChat('🤣')">🤣</span>
-          <span class="emote-btn" onclick="window.sendChat('😡')">😡</span>
-          <span class="emote-btn" onclick="window.sendChat('😢')">😢</span>
-          <span class="emote-btn" onclick="window.sendChat('🏳️')">🏳️</span>
-          <span class="emote-btn" onclick="window.sendChat('👏')">👏</span>
+          ${emotesHTML}
       </div>
       <div style="display: flex; border-top: 1px solid #cbd5e1; background:white;">
           <input type="text" id="chatInput" placeholder="Nhắn gì đó..." style="flex: 1; border: none; padding: 12px; outline: none; background:transparent;">
@@ -182,7 +185,8 @@ function updateUIState() {
       if (inGameUI) inGameUI.style.display = "flex";
   } else {
       if (inGameUI) inGameUI.style.display = "none";
-      document.getElementById("chatPanel").style.display = "none";
+      const chatPanel = document.getElementById("chatPanel");
+      if(chatPanel) chatPanel.style.display = "none";
   }
 
   if (State.isAiThinking) {
@@ -312,8 +316,6 @@ function applyMoveLocally(r, c, player, isOnlineSync = false) {
     highlightWinCells(winCells);
     State.gameActive = false;
     
-    // Nếu chơi offline hoặc mình đánh lệnh này (tự thắng), mới show bảng luôn
-    // Nếu online sync (đối thủ đánh), thông báo sẽ được Firebase gửi về kèm winCells
     if (!isOnlineSync) {
         let msg = modeSelect.value === "online" ? "🎉 Bạn đã chiến thắng!" : `🎉 Người chơi ${player} thắng!`;
         if (modeSelect.value !== "online" && player === "O") msg = "🤖 Máy đã thắng!";
@@ -428,7 +430,6 @@ function handleCellClick(e) {
     if (!State.currentRoomId || State.currentPlayer !== State.mySide) return;
     const result = applyMoveLocally(r, c, State.mySide);
     if (result.ok) {
-        // Gửi lệnh đánh, kèm theo data thắng/thua nếu có
         syncMoveToFirebase(r, c, State.mySide, result.winCells);
     }
     return;
@@ -508,7 +509,6 @@ window.joinOrCreateRoom = async function () {
       let pX = data.playerX;
       let pO = data.playerO;
 
-      // Xóa người chơi nếu bỏ hoang > 30 phút
       if (!data.lastActive || (now - data.lastActive > 30 * 60 * 1000)) { pX = ""; pO = ""; }
 
       if (pX === "" && pO === "") {
@@ -544,12 +544,11 @@ function listenToRoom(roomRef) {
     if (!snap.exists()) return;
     const data = snap.data();
 
-    // Cập nhật text trạng thái phòng
     if (data.playerX && data.playerO !== "" && roomStatus) {
       roomStatus.innerHTML = `Đang thi đấu: <b>${State.currentRoomId.replace("room_", "")}</b><br>(Bạn là quân ${State.mySide})`;
     }
 
-    // Xử lý Gạ Chơi Lại
+    // Xử lý Gạ Chơi Lại (Có Timeout)
     const btnRematch = document.getElementById("btnInGameRematch");
     if (data.rematchRequest) {
         if (data.rematchRequest !== State.mySide) {
@@ -558,7 +557,6 @@ function listenToRoom(roomRef) {
                btnRematch.innerHTML = "⚠️ Đối thủ gạ chơi lại (Bấm Đồng ý)";
                btnRematch.classList.add("pulse-btn");
             }
-            window.showToast("Đối thủ đang rủ bạn chơi ván mới!");
         } else {
             if(btnRematch) btnRematch.innerHTML = "⏳ Đang đợi đối thủ xác nhận...";
         }
@@ -570,17 +568,15 @@ function listenToRoom(roomRef) {
         }
     }
 
-    // Xử lý tín hiệu Reset (ván mới)
     if (data.resetSignal && data.resetSignal !== State.currentResetSignal) {
       State.currentResetSignal = data.resetSignal;
       resetLocalGame(true);
       State.currentPlayer = data.turn || "X";
       updateUIState();
       window.showToast("Ván mới đã bắt đầu!");
-      return; // Khỏi vẽ cờ cũ
+      return; 
     }
 
-    // Cập nhật Bàn Cờ
     if (Array.isArray(data.board1D) && data.board1D.length === BOARD_SIZE * BOARD_SIZE) {
       const serverBoard = unflattenTo2D(data.board1D);
       for (let r = 0; r < BOARD_SIZE; r++) {
@@ -599,7 +595,6 @@ function listenToRoom(roomRef) {
       }
     }
 
-    // Đánh dấu nước đi cuối
     if (typeof data.lastMoveIndex === "number" && data.lastMoveIndex !== -1) {
       const { r, c } = rcFromIndex(data.lastMoveIndex);
       const cell = getCellElement(r, c);
@@ -610,16 +605,13 @@ function listenToRoom(roomRef) {
       }
     }
 
-    // XỬ LÝ NHẬN THÔNG BÁO THẮNG TỪ ĐỐI THỦ
     if (data.winner && State.gameActive) {
        State.gameActive = false;
        if (data.winCells) highlightWinCells(data.winCells);
-       
        let msg = (data.winner === State.mySide) ? "🎉 Bạn đã chiến thắng!" : "🥲 Đối thủ đã chiến thắng!";
        showModal(msg);
     }
 
-    // Xử lý Chat & Emote Mới
     if (data.chatMessage && data.chatMessage.id !== State.lastChatId) {
         State.lastChatId = data.chatMessage.id;
         displayIncomingChat(data.chatMessage);
@@ -643,7 +635,6 @@ function syncMoveToFirebase(row, col, playerJustMoved, winCellsData) {
     lastActive: Date.now()
   };
 
-  // Nếu nước này thắng, gửi kèm cờ winner và đường winCells lên mạng để máy kia biết
   if (winCellsData) {
       payload.winner = playerJustMoved;
       payload.winCells = winCellsData;
@@ -653,14 +644,14 @@ function syncMoveToFirebase(row, col, playerJustMoved, winCellsData) {
 }
 
 /* =======================
-   REMATCH (Xác nhận 2 chiều)
+   REMATCH (Xác nhận 2 chiều + Hủy sau 5s)
 ======================= */
 window.requestRematch = async function () {
   const mode = modeSelect ? modeSelect.value : "pvp";
   if (mode === "online" && State.currentRoomId) {
     const roomRef = doc(db, "rooms", State.currentRoomId);
     
-    // Nếu đối thủ đã gạ rồi, mình ấn tức là ĐỒNG Ý -> Xóa bàn cờ ngay lập tức
+    // Nếu đối thủ đã gạ rồi, mình ấn tức là ĐỒNG Ý
     if (State.opponentRequestedRematch) {
        if (modalOverlay) modalOverlay.classList.remove("active");
        await updateDoc(roomRef, { 
@@ -670,19 +661,31 @@ window.requestRematch = async function () {
            resetSignal: Date.now(), lastActive: Date.now() 
        }).catch(e => console.error(e));
     } 
-    // Nếu chưa ai gạ, mình là người gạ -> Gửi request lên Firebase chờ
+    // Nếu chưa ai gạ, mình là người gạ
     else {
        await updateDoc(roomRef, { rematchRequest: State.mySide, lastActive: Date.now() }).catch(e=>console.error(e));
-       window.showToast("Đã gửi lời mời, chờ đối thủ xác nhận!");
+       window.showToast("Đã gửi lời mời, chờ (5 giây)...");
+
+       // Tính năng HỦY SAU 5 GIÂY NẾU KHÔNG TRẢ LỜI
+       setTimeout(async () => {
+           if (State.currentRoomId) {
+               const snap = await getDoc(roomRef);
+               // Nếu sau 5s mà request trên Firebase vẫn là của mình (tức là đối phương chưa bấm Đồng ý)
+               if (snap.exists() && snap.data().rematchRequest === State.mySide) {
+                   updateDoc(roomRef, { rematchRequest: null }).catch(()=>{});
+                   window.showToast("Lời mời chơi lại đã hết hạn!");
+               }
+           }
+       }, 5000);
     }
   } else {
       window.initGame();
   }
 };
-window.triggerRematch = window.requestRematch; // Gắn chung cho nút trong Bảng Modal
+window.triggerRematch = window.requestRematch; 
 
 /* =======================
-   CHAT & EMOTE LOGIC
+   CHAT LOGIC
 ======================= */
 window.toggleChat = function() {
     const panel = document.getElementById("chatPanel");
@@ -691,7 +694,6 @@ window.toggleChat = function() {
     if (panel.style.display === "none" || panel.style.display === "") {
         panel.style.display = "flex";
         if(notif) notif.style.display = "none";
-        // Scroll to bottom
         const box = document.getElementById("chatMessages");
         if(box) box.scrollTop = box.scrollHeight;
     } else {
@@ -729,7 +731,6 @@ function displayIncomingChat(msgData) {
     box.appendChild(div);
     box.scrollTop = box.scrollHeight;
 
-    // Show popup/toast và chấm đỏ nếu đang đóng khung chat
     if (!isMe && (panel.style.display === "none" || panel.style.display === "")) {
         if(notif) notif.style.display = "block";
         window.showToast("💬 Đối thủ: " + msgData.text);
@@ -778,7 +779,7 @@ let cheatClicks = 0; let cheatTimeout = null;
 window.handleFooterClick = function () {
   clearTimeout(cheatTimeout); cheatClicks++;
   const cheatBtn = document.getElementById("cheatBtn");
-  if (cheatClicks >= 3) { if (cheatBtn) cheatBtn.style.display = "block"; cheatClicks = 0; return; }
+  if (cheatClicks >= 5) { if (cheatBtn) cheatBtn.style.display = "block"; cheatClicks = 0; return; }
   cheatTimeout = setTimeout(() => {
     if (cheatClicks === 2) { if (cheatBtn) cheatBtn.style.display = "none"; }
     cheatClicks = 0;
@@ -827,7 +828,7 @@ window.exitFullScreen = function () {
    START 
 ======================= */
 document.addEventListener("DOMContentLoaded", () => {
-   injectOnlineUI(); // Sinh giao diện Chat/Rematch tự động
+   injectOnlineUI(); 
    buildBoardDOM();
    window.initGame();
    
