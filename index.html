@@ -244,8 +244,8 @@
         <h1>Cờ Caro</h1>
         <div class="controls">
             <select id="gameMode" onchange="window.handleModeChange()">
-                <option value="pve-super">Máy (Siêu Khó)</option>
-                <option value="pve-hard">Máy (Khó)</option>
+                <option value="pve-super">Máy (Siêu Khó )</option>
+                <option value="pve-hard">Máy (Khó )</option>
                 <option value="pve-medium">Máy (Vừa)</option>
                 <option value="pve-easy">Máy (Dễ)</option>
                 <option value="pvp">2 Người (Cùng máy)</option>
@@ -303,8 +303,12 @@
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
-        // CẤU HÌNH FIREBASE CỦA BẠN ĐÃ ĐƯỢC CHÈN VÀO ĐÂY
-        const defaultFirebaseConfig = {
+        // BẠN HÃY ĐIỀN API KEY GEMINI CỦA BẠN VÀO ĐÂY
+        // Nếu để trống, hệ thống sẽ tự dùng AI nội bộ siêu cứng.
+        const GEMINI_API_KEY = "AIzaSyBAN2tEXFVDt8eSXdcb8xZWk7aEs6VHEv8"; 
+
+        // CẤU HÌNH FIREBASE
+        const firebaseConfig = {
             apiKey: "AIzaSyAVEiHOD1xTnlAFW3h-YjmQcHPsx4saaLo",
             authDomain: "cocaro-8be98.firebaseapp.com",
             projectId: "cocaro-8be98",
@@ -315,10 +319,9 @@
         };
 
         let app, auth, db, user;
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'github-caro-huy';
+        const appId = 'github-caro-huy';
         
         try {
-            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : defaultFirebaseConfig;
             app = initializeApp(firebaseConfig);
             auth = getAuth(app);
             db = getFirestore(app);
@@ -353,13 +356,13 @@
         let cheatClicks = 0;
         let cheatTimeout;
 
-        // BẢNG ĐIỂM HEURISTIC GOMOKU (Bẫy)
+        // BẢNG ĐIỂM HEURISTIC GOMOKU (Local AI)
         const WIN_SCORE = 100000000;
         const OPEN4_SCORE = 10000000;
         const CLOSED4_SCORE = 1000000;
-        const OPEN3_SCORE = 500000; // Khuyến khích tạo bẫy chéo 3-3
+        const OPEN3_SCORE = 500000; 
         const CLOSED3_SCORE = 10000;
-        const OPEN2_SCORE = 5000;   // Tạo tiền đề
+        const OPEN2_SCORE = 5000;   
 
         // --- HÀM KHỞI TẠO ---
         window.initGame = function(keepOnline = false) {
@@ -406,7 +409,7 @@
 
         function updateUIState() {
             if (isAiThinking) {
-                turnIndicator.textContent = "Máy đang tính...";
+                turnIndicator.textContent = "AI đang nghĩ...";
                 turnIndicator.style.color = "#94a3b8";
             } else {
                 if (modeSelect.value === 'pvp') {
@@ -440,7 +443,7 @@
 
             // Xử lý Chơi Online
             if (modeSelect.value === 'online') {
-                if (!currentRoomId || currentPlayer !== mySide) return; // Không phải lượt của mình
+                if (!currentRoomId || currentPlayer !== mySide) return;
                 applyMoveLocally(row, col, mySide);
                 syncMoveToFirebase(row, col);
                 return;
@@ -453,7 +456,7 @@
                 isAiThinking = true;
                 updateUIState();
                 setTimeout(() => {
-                    executeAiMove(modeSelect.value.split('-')[1]);
+                    triggerAITurn(modeSelect.value.split('-')[1], 'O');
                 }, 100);
             }
         }
@@ -493,7 +496,159 @@
             updateUIState();
         }
 
-        // --- AI (MÁY) LOGIC ---
+        // --- TÍCH HỢP GEMINI API VÀ LOCAL AI FALLBACK ---
+        async function triggerAITurn(difficulty, aiSide) {
+            let bestMove = null;
+
+            // Nếu người chơi chọn Siêu Khó (Super) VÀ có nhập Key API Gemini -> Gọi AI xịn
+            if (difficulty === 'super' && GEMINI_API_KEY) {
+                turnIndicator.textContent = "🧠 Mạng API Real đang phân tích...";
+                bestMove = await fetchGeminiMove(aiSide);
+            }
+
+            // Nếu Gemini Lỗi, Không có Key, hoặc chọn chế độ dễ hơn -> Chạy AI Local gánh team
+            if (!bestMove) {
+                if (difficulty === 'super') turnIndicator.textContent = "💻 AI Cục bộ đang xử lý chặn...";
+                else turnIndicator.textContent = "Máy đang tính...";
+                
+                await new Promise(r => setTimeout(r, 50)); // Khựng nhẹ UI
+                bestMove = calculateLocalAIMove(difficulty, aiSide);
+            }
+
+            if (bestMove) {
+                applyMoveLocally(bestMove.r, bestMove.c, aiSide);
+                if (modeSelect.value === 'online' && currentRoomId) {
+                    syncMoveToFirebase(bestMove.r, bestMove.c);
+                }
+            }
+            isAiThinking = false;
+            updateUIState();
+        }
+
+        // HÀM GỌI API GEMINI
+        async function fetchGeminiMove(aiSide) {
+            const oppSide = aiSide === 'X' ? 'O' : 'X';
+            let boardStr = "";
+            let emptyCount = 0;
+            
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    boardStr += (board[r][c] === '' ? '.' : board[r][c]) + " ";
+                    if (board[r][c] === '') emptyCount++;
+                }
+                boardStr += "\n";
+            }
+
+            // Nếu bàn cờ trống, auto đánh giữa
+            if (emptyCount === BOARD_SIZE * BOARD_SIZE) {
+                return { r: Math.floor(BOARD_SIZE/2), c: Math.floor(BOARD_SIZE/2) };
+            }
+
+            const prompt = `You are a Gomoku AI playing as '${aiSide}'. Opponent is '${oppSide}'. Board is 20x20.
+Rows are 0-19, Cols are 0-19.
+Board state:
+${boardStr}
+Find the absolute best coordinate to place your piece to either win or block the opponent.
+Respond ONLY with a JSON object: {"r": row_index, "c": col_index}. Ensure the cell is currently '.'`;
+
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: { responseMimeType: "application/json" }
+                    })
+                });
+
+                if (!response.ok) return null;
+                const data = await response.json();
+                let text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                
+                if (text) {
+                    text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+                    const result = JSON.parse(text);
+                    if (Number.isInteger(result.r) && Number.isInteger(result.c) &&
+                        result.r >= 0 && result.r < BOARD_SIZE && 
+                        result.c >= 0 && result.c < BOARD_SIZE && 
+                        board[result.r][result.c] === '') {
+                        return result;
+                    }
+                }
+            } catch (err) {
+                console.log("Lỗi API AI:", err);
+            }
+            return null; // Trả về null để kích hoạt fallback AI Cục bộ
+        }
+
+        // HÀM AI CỤC BỘ (FALLBACK)
+        function calculateLocalAIMove(difficulty, aiSide) {
+            let oppSide = aiSide === 'X' ? 'O' : 'X';
+            let candidates = [];
+
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    if (board[r][c] === '') {
+                        let near = false;
+                        for (let i = -2; i <= 2; i++) {
+                            for (let j = -2; j <= 2; j++) {
+                                let nr = r+i, nc = c+j;
+                                if (nr>=0 && nr<BOARD_SIZE && nc>=0 && nc<BOARD_SIZE && board[nr][nc] !== '') {
+                                    near = true; break;
+                                }
+                            }
+                            if (near) break;
+                        }
+                        if (near) candidates.push({r, c});
+                    }
+                }
+            }
+
+            if (candidates.length === 0) return {r: Math.floor(BOARD_SIZE/2), c: Math.floor(BOARD_SIZE/2)};
+
+            candidates.forEach(m => m.score = evaluateCell(m.r, m.c, aiSide, oppSide));
+            candidates.sort((a, b) => b.score - a.score);
+
+            if (difficulty === 'easy') {
+                return candidates[Math.floor(Math.random() * Math.min(10, candidates.length))];
+            } else if (difficulty === 'medium') {
+                return candidates[Math.floor(Math.random() * Math.min(4, candidates.length))];
+            } else if (difficulty === 'hard') {
+                return candidates[0]; 
+            } else {
+                // Minimax siêu khó (Fallback)
+                let topMoves = candidates.slice(0, Math.min(15, candidates.length));
+                let bestSuperScore = -Infinity;
+                let bestMove = topMoves[0];
+
+                for (let move of topMoves) {
+                    board[move.r][move.c] = aiSide;
+                    let maxOppScore = -Infinity;
+                    
+                    for (let tr = 0; tr < BOARD_SIZE; tr++) {
+                        for (let tc = 0; tc < BOARD_SIZE; tc++) {
+                            if (board[tr][tc] === '') {
+                                let oppScore = evaluateCell(tr, tc, oppSide, aiSide);
+                                if (oppScore > maxOppScore) maxOppScore = oppScore;
+                                if (oppScore >= WIN_SCORE) break;
+                            }
+                        }
+                        if (maxOppScore >= WIN_SCORE) break;
+                    }
+                    
+                    board[move.r][move.c] = '';
+                    let finalScore = move.score - (maxOppScore * 1.2);
+
+                    if (finalScore > bestSuperScore) {
+                        bestSuperScore = finalScore;
+                        bestMove = move;
+                    }
+                }
+                return bestMove;
+            }
+        }
+
+        // HỆ THỐNG CHẤM ĐIỂM (Dùng cho AI Cục bộ)
         function getLinePattern(row, col, dRow, dCol, player) {
             let count = 1; let blocks = 0; let r, c;
             let space1 = 0, space2 = 0;
@@ -534,83 +689,9 @@
                 let ai = getLinePattern(row, col, dr, dc, aiSide);
                 let opp = getLinePattern(row, col, dr, dc, oppSide);
                 score += getPatternScore(ai.count, ai.blocks);
-                score += getPatternScore(opp.count, opp.blocks) * 1.5; // Chặn đòn nhỉnh hơn xây nhà
+                score += getPatternScore(opp.count, opp.blocks) * 1.5; 
             }
             return score;
-        }
-
-        function executeAiMove(difficulty, aiSide = 'O') {
-            let oppSide = aiSide === 'X' ? 'O' : 'X';
-            let candidates = [];
-
-            for (let r = 0; r < BOARD_SIZE; r++) {
-                for (let c = 0; c < BOARD_SIZE; c++) {
-                    if (board[r][c] === '') {
-                        let near = false;
-                        for (let i = -2; i <= 2; i++) {
-                            for (let j = -2; j <= 2; j++) {
-                                let nr = r+i, nc = c+j;
-                                if (nr>=0 && nr<BOARD_SIZE && nc>=0 && nc<BOARD_SIZE && board[nr][nc] !== '') {
-                                    near = true; break;
-                                }
-                            }
-                            if (near) break;
-                        }
-                        if (near) candidates.push({r, c});
-                    }
-                }
-            }
-
-            if (candidates.length === 0) {
-                applyMoveLocally(Math.floor(BOARD_SIZE/2), Math.floor(BOARD_SIZE/2), aiSide);
-                isAiThinking = false;
-                return {r: Math.floor(BOARD_SIZE/2), c: Math.floor(BOARD_SIZE/2)};
-            }
-
-            candidates.forEach(m => m.score = evaluateCell(m.r, m.c, aiSide, oppSide));
-            candidates.sort((a, b) => b.score - a.score);
-
-            let bestMove;
-            if (difficulty === 'easy') {
-                bestMove = candidates[Math.floor(Math.random() * Math.min(10, candidates.length))];
-            } else if (difficulty === 'medium') {
-                bestMove = candidates[Math.floor(Math.random() * Math.min(4, candidates.length))];
-            } else if (difficulty === 'hard') {
-                bestMove = candidates[0]; // Greedy thuần
-            } else {
-                // Siêu Khó: Nhìn trước 1 nước (Minimax Depth 1)
-                let topMoves = candidates.slice(0, Math.min(15, candidates.length));
-                let bestSuperScore = -Infinity;
-                bestMove = topMoves[0];
-
-                for (let move of topMoves) {
-                    board[move.r][move.c] = aiSide;
-                    let maxOppScore = -Infinity;
-                    
-                    for (let tr = 0; tr < BOARD_SIZE; tr++) {
-                        for (let tc = 0; tc < BOARD_SIZE; tc++) {
-                            if (board[tr][tc] === '') {
-                                let oppScore = evaluateCell(tr, tc, oppSide, aiSide);
-                                if (oppScore > maxOppScore) maxOppScore = oppScore;
-                                if (oppScore >= WIN_SCORE) break;
-                            }
-                        }
-                        if (maxOppScore >= WIN_SCORE) break;
-                    }
-                    
-                    board[move.r][move.c] = '';
-                    let finalScore = move.score - (maxOppScore * 1.2);
-
-                    if (finalScore > bestSuperScore) {
-                        bestSuperScore = finalScore;
-                        bestMove = move;
-                    }
-                }
-            }
-
-            applyMoveLocally(bestMove.r, bestMove.c, aiSide);
-            isAiThinking = false;
-            return bestMove; // Trả về nước đi cho Cheat Online
         }
 
         // --- CHỨC NĂNG ONLINE (FIREBASE) ---
@@ -621,7 +702,6 @@
             mySide = 'X';
             
             try {
-                // Sử dụng đường dẫn cơ bản cho Firebase tự do
                 const roomRef = doc(db, 'rooms', currentRoomId);
                 await setDoc(roomRef, {
                     board1D: Array(BOARD_SIZE * BOARD_SIZE).fill(''),
@@ -637,7 +717,6 @@
             } catch (e) {
                 console.error(e);
                 roomStatus.innerHTML = "Lỗi tạo phòng! Kiểm tra lại Firebase Firestore Rules.";
-                alert("Lỗi: Bạn cần vào Firebase > Firestore Database > Rules và chỉnh sửa thành: allow read, write: if true;");
             }
         };
 
@@ -701,17 +780,16 @@
             const roomRef = doc(db, 'rooms', currentRoomId);
             const index = row * BOARD_SIZE + col;
             try {
-                // Chuyển mảng 2D thành 1D
                 const board1D = board.flat();
                 await updateDoc(roomRef, {
                     board1D: board1D,
-                    turn: currentPlayer, // Đã bị đổi ở applyMoveLocally
+                    turn: currentPlayer, 
                     lastMoveIndex: index
                 });
             } catch(e) { console.error("Lỗi đồng bộ", e); }
         }
 
-        // --- CHỨC NĂNG ẨN (CHEAT) ---
+        // --- CHỨC NĂNG ẨN (CHEAT - HUY) ---
         window.handleFooterClick = function() {
             clearTimeout(cheatTimeout);
             cheatClicks++;
@@ -727,10 +805,14 @@
             
             if (modeSelect.value === 'online') {
                 if (!currentRoomId || currentPlayer !== mySide) return;
-                let move = executeAiMove('super', mySide); // Gọi AI đánh hộ
-                syncMoveToFirebase(move.r, move.c);
+                isAiThinking = true;
+                updateUIState();
+                // Bấm cheat thì kích hoạt AI giúp người chơi
+                setTimeout(() => triggerAITurn('super', mySide), 100);
             } else {
-                executeAiMove('super', currentPlayer); // Chơi offline
+                isAiThinking = true;
+                updateUIState();
+                setTimeout(() => triggerAITurn('super', currentPlayer), 100);
             }
         };
 
@@ -756,7 +838,7 @@
         }
 
         window.undoMove = function() {
-            if (moveHistory.length < 1 || isAiThinking || modeSelect.value === 'online') return; // Không cho undo khi đánh online
+            if (moveHistory.length < 1 || isAiThinking || modeSelect.value === 'online') return; 
             const steps = modeSelect.value.startsWith('pve') ? 2 : 1;
             for (let i = 0; i < steps; i++) {
                 if (moveHistory.length === 0) break;
