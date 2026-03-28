@@ -3,6 +3,8 @@ import {
   getFirestore, doc, setDoc, getDoc, updateDoc,
   onSnapshot, collection, query, where
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+// THÊM DÒNG NÀY ĐỂ GỌI TÍNH NĂNG ĐĂNG NHẬP
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
 /* =======================
    FIREBASE
@@ -18,20 +20,31 @@ const firebaseConfig = {
 
 let app = null;
 let db = null;
+let auth = null; // Thêm biến auth
 try {
   app = initializeApp(firebaseConfig);
   db = getFirestore(app);
+  auth = getAuth(app); // Khởi tạo auth
 } catch (e) {
   console.log("Chạy ở chế độ Offline.", e);
 }
 
 /* =======================
-   LOCAL UID
+   XÁC THỰC FIREBASE (THAY THẾ LOCAL UID)
 ======================= */
-let myLocalUid = localStorage.getItem("caro_uid");
-if (!myLocalUid) {
-  myLocalUid = "user_" + Date.now() + "_" + Math.random().toString(36).slice(2, 9);
-  localStorage.setItem("caro_uid", myLocalUid);
+let myLocalUid = ""; 
+
+// Bắt đầu đăng nhập ẩn danh ngay khi tải trang
+if (auth) {
+  signInAnonymously(auth)
+    .then((userCredential) => {
+      // Firebase tự động cấp 1 UID hợp lệ và siêu bảo mật
+      myLocalUid = userCredential.user.uid; 
+      console.log("Đã kết nối an toàn với ID:", myLocalUid);
+    })
+    .catch((error) => {
+      console.error("Lỗi cấp quyền Firebase:", error);
+    });
 }
 
 /* =======================
