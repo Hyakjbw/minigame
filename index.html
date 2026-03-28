@@ -19,8 +19,7 @@
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-tap-highlight-color: transparent; }
 
         body {
-            background-color: #f1f5f9;
-            color: var(--text-main);
+            background-color: #f1f5f9; color: var(--text-main);
             font-family: 'Segoe UI', system-ui, sans-serif;
             display: flex; flex-direction: column; align-items: center;
             min-height: 100vh; padding: 15px 10px;
@@ -54,6 +53,18 @@
             border: 2px dashed #94a3b8;
         }
         .online-group { margin-top: 12px; display: flex; gap: 8px; justify-content: center;}
+
+        /* Danh sách phòng */
+        .room-list-container {
+            display: flex; overflow-x: auto; gap: 8px; padding: 8px 2px; scrollbar-width: none; margin-top: 5px;
+        }
+        .room-list-container::-webkit-scrollbar { display: none; }
+        .btn-room {
+            background: #e0f2fe; color: #1e40af; border: 1px solid #bfdbfe;
+            white-space: nowrap; padding: 6px 12px; border-radius: 20px;
+            cursor: pointer; font-weight: 600; font-size: 0.85rem; transition: 0.2s;
+        }
+        .btn-room:hover { background: #bfdbfe; transform: scale(1.05); }
 
         .status-bar { margin-bottom: 15px; }
 
@@ -158,7 +169,7 @@
         <h1>Cờ Caro</h1>
         <div class="controls">
             <select id="gameMode" onchange="window.handleModeChange()">
-                <option value="pve-super">Máy (Siêu Khó)</option>
+                <option value="pve-super">Máy (Siêu Khó - Tinh ranh)</option>
                 <option value="pve-hard">Máy (Khó)</option>
                 <option value="pve-medium">Máy (Vừa)</option>
                 <option value="pve-easy">Máy (Dễ)</option>
@@ -172,12 +183,22 @@
 
         <div id="onlinePanel">
             <div style="font-weight: 700; color: #1e293b; margin-bottom: 5px;">KẾT NỐI PHÒNG CHƠI</div>
-            <div style="font-size: 0.85rem; color: #64748b;">(Nhập chung 1 tên phòng để chơi cùng nhau)</div>
+            <div style="font-size: 0.85rem; color: #64748b;">Nhập tên phòng để vào hoặc Chọn từ danh sách dưới</div>
+            
             <div class="online-group">
                 <input type="text" id="roomIdInput" placeholder="Ví dụ: vip123" maxlength="15" style="flex: 1;">
-                <button class="btn-action btn-primary" onclick="window.joinOrCreateRoom()">Vào / Tạo Phòng</button>
+                <button class="btn-action btn-primary" onclick="window.joinOrCreateRoom()">Vào / Tạo</button>
             </div>
+            
             <div id="roomStatus" style="margin-top: 12px; font-weight: 600; color: #3b82f6;"></div>
+
+            <!-- Danh sách phòng trống -->
+            <div style="margin-top: 15px; border-top: 1px dashed #cbd5e1; padding-top: 10px;">
+                <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 5px;">Danh sách phòng đang chờ người:</div>
+                <div id="availableRooms" class="room-list-container">
+                    <div style="color:#94a3b8; font-size:0.85rem;">Đang tải...</div>
+                </div>
+            </div>
         </div>
 
         <div class="status-bar">
@@ -199,7 +220,7 @@
         <div class="modal-content">
             <h2 class="modal-title" id="modalMessage">Chiến Thắng!</h2>
             <button class="modal-btn" id="btnModalClose" onclick="window.closeModal()">Xem bàn cờ</button>
-            <button class="modal-btn modal-btn-primary" id="btnModalRematch" onclick="window.triggerRematch()">Chơi ván mới</button>
+            <button class="modal-btn modal-btn-primary" id="btnModalRematch" onclick="window.triggerRematch()">Chơi tiếp (Cùng phòng)</button>
         </div>
     </div>
 
@@ -209,574 +230,9 @@
 
     <button id="cheatBtn" onclick="window.triggerCheat()">🪄 Đánh Giúp (AI)</button>
 
-    <!-- Kịch bản Module tích hợp Firebase -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-
-        // CẤU HÌNH FIREBASE CỦA BẠN (Không dùng Auth nữa để tránh lỗi IP)
-        const firebaseConfig = {
-            apiKey: "AIzaSyAVEiHOD1xTnlAFW3h-YjmQcHPsx4saaLo",
-            authDomain: "cocaro-8be98.firebaseapp.com",
-            projectId: "cocaro-8be98",
-            storageBucket: "cocaro-8be98.firebasestorage.app",
-            messagingSenderId: "620011719200",
-            appId: "1:620011719200:web:fe8f79429587d96ddb4a45"
-        };
-
-        let app, db;
-        
-        try {
-            app = initializeApp(firebaseConfig);
-            db = getFirestore(app);
-        } catch (e) {
-            console.log("Chạy ở chế độ Offline.", e);
-        }
-
-        // TẠO LOCAL ID (Khắc phục lỗi nhiều máy cùng IP bị Firebase chặn)
-        let myLocalUid = localStorage.getItem('caro_uid');
-        if (!myLocalUid) {
-            myLocalUid = 'user_' + Math.random().toString(36).substring(2, 10);
-            localStorage.setItem('caro_uid', myLocalUid);
-        }
-
-        // --- CÁC BIẾN CỦA GAME ---
-        const BOARD_SIZE = 20;
-        const boardElement = document.getElementById('board');
-        const turnIndicator = document.getElementById('turnIndicator');
-        const modeSelect = document.getElementById('gameMode');
-        const onlinePanel = document.getElementById('onlinePanel');
-        const roomStatus = document.getElementById('roomStatus');
-
-        let board = [];
-        let moveHistory = [];
-        let currentPlayer = 'X';
-        let gameActive = true;
-        let lastMoveElement = null;
-        let isAiThinking = false;
-        
-        // Biến cho Online
-        let currentRoomId = null;
-        let mySide = null; 
-        let unsubscribe = null;
-        let currentResetFlag = 0; // Dùng để đồng bộ nút Chơi Lại
-
-        // Biến Cheat
-        let cheatClicks = 0;
-        let cheatTimeout;
-
-        // BẢNG ĐIỂM AI CỤC BỘ
-        const WIN_SCORE = 100000000;
-        const OPEN4_SCORE = 10000000;
-        const CLOSED4_SCORE = 1000000;
-        const OPEN3_SCORE = 500000; 
-        const CLOSED3_SCORE = 10000;
-        const OPEN2_SCORE = 5000;   
-
-        // --- HÀM KHỞI TẠO ---
-        window.initGame = function(keepOnline = false) {
-            boardElement.innerHTML = '';
-            board = Array.from({ length: BOARD_SIZE }, () => Array(BOARD_SIZE).fill(''));
-            moveHistory = [];
-            
-            for (let i = 0; i < BOARD_SIZE; i++) {
-                for (let j = 0; j < BOARD_SIZE; j++) {
-                    const cell = document.createElement('div');
-                    cell.className = 'cell';
-                    cell.dataset.row = i;
-                    cell.dataset.col = j;
-                    cell.addEventListener('click', handleCellClick);
-                    boardElement.appendChild(cell);
-                }
-            }
-
-            currentPlayer = 'X';
-            gameActive = true;
-            lastMoveElement = null;
-            isAiThinking = false;
-            document.getElementById('modalOverlay').classList.remove('active');
-            
-            if (!keepOnline) {
-                if (unsubscribe) { unsubscribe(); unsubscribe = null; }
-                currentRoomId = null;
-                mySide = null;
-                currentResetFlag = 0;
-                roomStatus.innerHTML = '';
-            }
-            updateUIState();
-        };
-
-        window.handleModeChange = function() {
-            if (modeSelect.value === 'online') {
-                onlinePanel.style.display = 'block';
-                window.initGame();
-            } else {
-                onlinePanel.style.display = 'none';
-                window.initGame();
-            }
-        };
-
-        function updateUIState() {
-            if (isAiThinking) {
-                turnIndicator.textContent = "Máy đang tính...";
-                turnIndicator.style.color = "#94a3b8";
-                turnIndicator.style.borderColor = "#94a3b8";
-            } else {
-                if (modeSelect.value === 'pvp') {
-                    turnIndicator.textContent = `Lượt đi: Người chơi ${currentPlayer}`;
-                    turnIndicator.style.color = currentPlayer === 'X' ? 'var(--x-color)' : 'var(--o-color)';
-                    turnIndicator.style.borderColor = currentPlayer === 'X' ? 'var(--x-color)' : 'var(--o-color)';
-                } else if (modeSelect.value === 'online') {
-                    if (currentRoomId) {
-                        if (currentPlayer === mySide) {
-                            turnIndicator.textContent = `Lượt đi: Bạn (${currentPlayer})`;
-                            turnIndicator.style.color = currentPlayer === 'X' ? 'var(--x-color)' : 'var(--o-color)';
-                        } else {
-                            turnIndicator.textContent = `Lượt đi: Đối thủ (${currentPlayer})`;
-                            turnIndicator.style.color = "#64748b";
-                        }
-                        turnIndicator.style.borderColor = currentPlayer === 'X' ? 'var(--x-color)' : 'var(--o-color)';
-                    } else {
-                        turnIndicator.textContent = "Chưa vào phòng";
-                        turnIndicator.style.color = "#94a3b8";
-                        turnIndicator.style.borderColor = "#cbd5e1";
-                    }
-                } else {
-                    turnIndicator.textContent = currentPlayer === 'X' ? "Lượt đi: Bạn (X)" : "Lượt đi: Máy (O)";
-                    turnIndicator.style.color = currentPlayer === 'X' ? 'var(--x-color)' : 'var(--o-color)';
-                    turnIndicator.style.borderColor = currentPlayer === 'X' ? 'var(--x-color)' : 'var(--o-color)';
-                }
-            }
-        }
-
-        // --- LOGIC ĐÁNH CỜ LOCAL ---
-        function handleCellClick(e) {
-            if (!gameActive || isAiThinking) return;
-            const row = parseInt(e.target.dataset.row);
-            const col = parseInt(e.target.dataset.col);
-            if (board[row][col] !== '') return;
-
-            if (modeSelect.value === 'online') {
-                if (!currentRoomId || currentPlayer !== mySide) return; // Không phải lượt
-                applyMoveLocally(row, col, mySide);
-                syncMoveToFirebase(row, col);
-                return;
-            }
-
-            applyMoveLocally(row, col, currentPlayer);
-
-            if (gameActive && modeSelect.value.startsWith('pve') && currentPlayer === 'O') {
-                isAiThinking = true;
-                updateUIState();
-                setTimeout(() => {
-                    let move = calculateLocalAIMove(modeSelect.value.split('-')[1], 'O');
-                    applyMoveLocally(move.r, move.c, 'O');
-                    isAiThinking = false;
-                    updateUIState();
-                }, 50);
-            }
-        }
-
-        function applyMoveLocally(row, col, player) {
-            board[row][col] = player;
-            const cell = getCellElement(row, col);
-            cell.textContent = player;
-            cell.classList.add(player.toLowerCase());
-
-            if (lastMoveElement) lastMoveElement.classList.remove('last-move');
-            cell.classList.add('last-move');
-            lastMoveElement = cell;
-
-            moveHistory.push({ row, col, player, element: cell });
-
-            const winCells = checkWin(row, col, player);
-            if (winCells) {
-                highlightWinCells(winCells);
-                let msg = "";
-                if (modeSelect.value === 'online') msg = player === mySide ? "🎉 Bạn đã thắng!" : "🥲 Đối thủ đã thắng!";
-                else if (modeSelect.value === 'pvp') msg = `🎉 Người chơi ${player} thắng!`;
-                else msg = player === 'X' ? "🎉 Bạn đã thắng!" : "🤖 Máy đã thắng!";
-                
-                showModal(msg);
-                gameActive = false;
-                return;
-            }
-
-            if (moveHistory.length === BOARD_SIZE * BOARD_SIZE) {
-                showModal("🤝 Hòa cờ!");
-                gameActive = false;
-                return;
-            }
-
-            currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
-            updateUIState();
-        }
-
-        // --- HÀM AI CỤC BỘ (SẠCH - SIÊU KHÓ) ---
-        function calculateLocalAIMove(difficulty, aiSide) {
-            let oppSide = aiSide === 'X' ? 'O' : 'X';
-            let candidates = [];
-
-            // Giới hạn vùng tìm kiếm: Chỉ kiểm tra các ô trống nằm cạnh các ô đã đánh
-            for (let r = 0; r < BOARD_SIZE; r++) {
-                for (let c = 0; c < BOARD_SIZE; c++) {
-                    if (board[r][c] === '') {
-                        let near = false;
-                        for (let i = -2; i <= 2; i++) {
-                            for (let j = -2; j <= 2; j++) {
-                                let nr = r+i, nc = c+j;
-                                if (nr>=0 && nr<BOARD_SIZE && nc>=0 && nc<BOARD_SIZE && board[nr][nc] !== '') {
-                                    near = true; break;
-                                }
-                            }
-                            if (near) break;
-                        }
-                        if (near) candidates.push({r, c});
-                    }
-                }
-            }
-
-            // Nếu bàn cờ trống trơn, đánh giữa
-            if (candidates.length === 0) return {r: Math.floor(BOARD_SIZE/2), c: Math.floor(BOARD_SIZE/2)};
-
-            // Ưu tiên 1: Có bắt buộc phải đỡ/thắng không?
-            let forcedMove = getForcedMove(aiSide, oppSide, candidates);
-            if (forcedMove) return forcedMove;
-
-            // Chấm điểm tất cả ô
-            candidates.forEach(m => m.score = evaluateCell(m.r, m.c, aiSide, oppSide));
-            candidates.sort((a, b) => b.score - a.score);
-
-            if (difficulty === 'easy') {
-                return candidates[Math.floor(Math.random() * Math.min(8, candidates.length))];
-            } else if (difficulty === 'medium') {
-                return candidates[Math.floor(Math.random() * Math.min(3, candidates.length))];
-            } else if (difficulty === 'hard') {
-                return candidates[0]; // Tham lam
-            } else {
-                // Minimax Alpha-Beta Depth 1 (Siêu Khó)
-                let topMoves = candidates.slice(0, Math.min(12, candidates.length));
-                let bestSuperScore = -Infinity;
-                let bestMove = topMoves[0];
-
-                for (let move of topMoves) {
-                    board[move.r][move.c] = aiSide; // Thử đánh
-                    let maxOppScore = -Infinity;
-                    
-                    // Đo lường phản kháng mạnh nhất của địch
-                    for (let tr = 0; tr < BOARD_SIZE; tr++) {
-                        for (let tc = 0; tc < BOARD_SIZE; tc++) {
-                            if (board[tr][tc] === '') {
-                                let oppScore = evaluateCell(tr, tc, oppSide, aiSide);
-                                if (oppScore > maxOppScore) maxOppScore = oppScore;
-                                if (oppScore >= WIN_SCORE) break; // Cắt tỉa
-                            }
-                        }
-                        if (maxOppScore >= WIN_SCORE) break;
-                    }
-                    
-                    board[move.r][move.c] = ''; // Hoàn lại
-                    let finalScore = move.score - (maxOppScore * 1.2);
-
-                    if (finalScore > bestSuperScore) {
-                        bestSuperScore = finalScore;
-                        bestMove = move;
-                    }
-                }
-                return bestMove;
-            }
-        }
-
-        function getForcedMove(aiSide, oppSide, candidates) {
-            let blockMove = null;
-            for (let move of candidates) {
-                // Thử đánh để xem có thắng ngay không
-                board[move.r][move.c] = aiSide;
-                if (checkWin(move.r, move.c, aiSide)) { board[move.r][move.c] = ''; return move; }
-                board[move.r][move.c] = '';
-
-                // Thử xem đối thủ có thắng ngay nếu đánh ô này không -> Chặn
-                board[move.r][move.c] = oppSide;
-                if (checkWin(move.r, move.c, oppSide)) { blockMove = move; }
-                board[move.r][move.c] = '';
-            }
-            return blockMove;
-        }
-
-        function evaluateCell(row, col, aiSide, oppSide) {
-            let score = 0;
-            const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
-            for (let [dr, dc] of directions) {
-                let ai = getLinePattern(row, col, dr, dc, aiSide);
-                let opp = getLinePattern(row, col, dr, dc, oppSide);
-                
-                let aiScore = getPatternScore(ai.count, ai.blocks);
-                let oppScore = getPatternScore(opp.count, opp.blocks);
-                
-                score += aiScore;
-                score += oppScore * 1.3; // Phòng thủ quan trọng hơn tấn công
-            }
-            return score;
-        }
-
-        function getLinePattern(row, col, dRow, dCol, player) {
-            let count = 1; let blocks = 0; let space1 = 0, space2 = 0;
-            let r, c;
-
-            r = row + dRow; c = col + dCol;
-            while (r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE && board[r][c] === player) { count++; r += dRow; c += dCol; }
-            if (r < 0 || r >= BOARD_SIZE || c < 0 || c >= BOARD_SIZE || (board[r][c] !== '' && board[r][c] !== player)) blocks++;
-            else {
-                let tr = r, tc = c;
-                while (tr >= 0 && tr < BOARD_SIZE && tc >= 0 && tc < BOARD_SIZE && board[tr][tc] === '') { space1++; tr += dRow; tc += dCol; }
-            }
-
-            r = row - dRow; c = col - dCol;
-            while (r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE && board[r][c] === player) { count++; r -= dRow; c -= dCol; }
-            if (r < 0 || r >= BOARD_SIZE || c < 0 || c >= BOARD_SIZE || (board[r][c] !== '' && board[r][c] !== player)) blocks++;
-            else {
-                let tr = r, tc = c;
-                while (tr >= 0 && tr < BOARD_SIZE && tc >= 0 && tc < BOARD_SIZE && board[tr][tc] === '') { space2++; tr -= dRow; tc -= dCol; }
-            }
-
-            if(count + space1 + space2 < 5) return {count: 0, blocks: 2};
-            return { count, blocks };
-        }
-
-        function getPatternScore(count, blocks) {
-            if (count >= 5) return WIN_SCORE;
-            if (blocks === 2) return 0;
-            if (count === 4) return blocks === 0 ? OPEN4_SCORE : CLOSED4_SCORE;
-            if (count === 3) return blocks === 0 ? OPEN3_SCORE : CLOSED3_SCORE;
-            if (count === 2) return blocks === 0 ? OPEN2_SCORE : 10;
-            return count;
-        }
-
-        // --- CHỨC NĂNG ONLINE (FIREBASE TỐI ƯU CHO CHƠI LẠI VÀ CHUNG MẠNG) ---
-        window.joinOrCreateRoom = async function() {
-            if(!db) return alert("Firebase chưa khởi tạo. Vui lòng chạy trên môi trường có mạng!");
-            let roomIdInput = document.getElementById('roomIdInput').value.trim().toLowerCase();
-            if (!roomIdInput) return alert("Vui lòng nhập tên phòng! (Ví dụ: huy123)");
-            
-            const roomId = "room_" + roomIdInput; // Tránh trùng lặp collection gốc
-            window.initGame(true);
-            const roomRef = doc(db, 'rooms', roomId);
-            
-            try {
-                const roomSnap = await getDoc(roomRef);
-                if (!roomSnap.exists()) {
-                    // TẠO PHÒNG (Người vào đầu tiên)
-                    await setDoc(roomRef, {
-                        board1D: Array(BOARD_SIZE * BOARD_SIZE).fill(''),
-                        turn: 'X',
-                        lastMoveIndex: -1,
-                        playerX: myLocalUid,
-                        playerO: null,
-                        resetFlag: 0
-                    });
-                    mySide = 'X';
-                    currentRoomId = roomId;
-                    roomStatus.innerHTML = `Đã tạo phòng: <span style="color:#2563eb; font-size:1.1rem">${roomIdInput}</span><br>Bạn là Quân X (Đi trước). Chờ đối thủ...`;
-                } else {
-                    // VÀO PHÒNG (Người vào sau)
-                    const data = roomSnap.data();
-                    
-                    // Nếu mình đã ở trong phòng này rồi (Vào lại)
-                    if (data.playerX === myLocalUid) {
-                        mySide = 'X';
-                    } else if (data.playerO === myLocalUid) {
-                        mySide = 'O';
-                    } 
-                    // Nếu phòng còn trống ghế O
-                    else if (!data.playerO) {
-                        await updateDoc(roomRef, { playerO: myLocalUid });
-                        mySide = 'O';
-                    } 
-                    // Phòng đã có 2 người khác
-                    else {
-                        return alert("Phòng này đã đủ 2 người đang chơi!");
-                    }
-
-                    currentRoomId = roomId;
-                    roomStatus.innerHTML = `Đã vào phòng: <span style="color:#2563eb; font-size:1.1rem">${roomIdInput}</span><br>Bạn là Quân ${mySide}`;
-                }
-                
-                listenToRoom(roomRef);
-            } catch(e) { 
-                console.error(e); 
-                alert("Lỗi truy cập dữ liệu! Đảm bảo Firebase Rules của bạn là: allow read, write: if true;");
-            }
-        };
-
-        function listenToRoom(roomRef) {
-            if (unsubscribe) unsubscribe();
-            unsubscribe = onSnapshot(roomRef, (doc) => {
-                if(!doc.exists()) return;
-                const data = doc.data();
-                
-                if (data.playerX && data.playerO) {
-                    roomStatus.innerHTML = `Đang chơi: <b>${currentRoomId.replace('room_','')}</b> (Bạn là quân ${mySide})`;
-                }
-
-                // Xử lý logic Reset (Chơi lại)
-                if (data.resetFlag > currentResetFlag) {
-                    currentResetFlag = data.resetFlag;
-                    // Dọn dẹp local board
-                    boardElement.innerHTML = '';
-                    board = Array.from({ length: BOARD_SIZE }, () => Array(BOARD_SIZE).fill(''));
-                    moveHistory = [];
-                    for (let i = 0; i < BOARD_SIZE; i++) {
-                        for (let j = 0; j < BOARD_SIZE; j++) {
-                            const cell = document.createElement('div');
-                            cell.className = 'cell';
-                            cell.dataset.row = i;
-                            cell.dataset.col = j;
-                            cell.addEventListener('click', handleCellClick);
-                            boardElement.appendChild(cell);
-                        }
-                    }
-                    currentPlayer = 'X';
-                    gameActive = true;
-                    lastMoveElement = null;
-                    document.getElementById('modalOverlay').classList.remove('active');
-                    updateUIState();
-                } 
-                else if (data.turn !== currentPlayer && gameActive) {
-                    // Nhận nước cờ từ đối thủ
-                    const lMove = data.lastMoveIndex;
-                    if (lMove !== -1) {
-                        const r = Math.floor(lMove / BOARD_SIZE);
-                        const c = lMove % BOARD_SIZE;
-                        if (board[r][c] === '') { 
-                            applyMoveLocally(r, c, currentPlayer); 
-                        }
-                    }
-                }
-            }, (err) => console.error(err));
-        }
-
-        async function syncMoveToFirebase(row, col) {
-            const roomRef = doc(db, 'rooms', currentRoomId);
-            const index = row * BOARD_SIZE + col;
-            try {
-                await updateDoc(roomRef, {
-                    turn: currentPlayer, 
-                    lastMoveIndex: index
-                });
-            } catch(e) { console.error("Lỗi đồng bộ", e); }
-        }
-
-        // Kích hoạt khi bấm nút "Chơi ván mới" trong phòng Online
-        window.triggerRematch = async function() {
-            if (modeSelect.value === 'online' && currentRoomId) {
-                const roomRef = doc(db, 'rooms', currentRoomId);
-                try {
-                    currentResetFlag++;
-                    await updateDoc(roomRef, {
-                        turn: 'X', 
-                        lastMoveIndex: -1,
-                        resetFlag: currentResetFlag
-                    });
-                } catch(e) { console.error("Lỗi tạo lại ván", e); }
-            } else {
-                window.initGame();
-            }
-        };
-
-        // --- CHỨC NĂNG ẨN (CHEAT - HUY) ---
-        window.handleFooterClick = function() {
-            clearTimeout(cheatTimeout);
-            cheatClicks++;
-            if (cheatClicks >= 5) {
-                document.getElementById('cheatBtn').style.display = 'block';
-                cheatClicks = 0;
-            }
-            cheatTimeout = setTimeout(() => { cheatClicks = 0; }, 2000);
-        };
-
-        window.triggerCheat = function() {
-            if (!gameActive || isAiThinking) return;
-            
-            if (modeSelect.value === 'online') {
-                if (!currentRoomId || currentPlayer !== mySide) return;
-                isAiThinking = true;
-                updateUIState();
-                setTimeout(() => {
-                    let move = calculateLocalAIMove('super', mySide);
-                    applyMoveLocally(move.r, move.c, mySide);
-                    syncMoveToFirebase(move.r, move.c);
-                    isAiThinking = false;
-                    updateUIState();
-                }, 50);
-            } else {
-                isAiThinking = true;
-                updateUIState();
-                setTimeout(() => {
-                    let move = calculateLocalAIMove('super', currentPlayer);
-                    applyMoveLocally(move.r, move.c, currentPlayer);
-                    isAiThinking = false;
-                    updateUIState();
-                }, 50);
-            }
-        };
-
-        // --- TIỆN ÍCH ---
-        function checkWin(row, col, player) {
-            const directions = [[[0, 1], [0, -1]], [[1, 0], [-1, 0]], [[1, 1], [-1, -1]], [[1, -1], [-1, 1]]];
-            for (let dir of directions) {
-                let winCells = [{row, col}];
-                for (let [dr, dc] of dir) {
-                    let r = row + dr, c = col + dc;
-                    while (r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE && board[r][c] === player) {
-                        winCells.push({row: r, col: c});
-                        r += dr; c += dc;
-                    }
-                }
-                if (winCells.length >= 5) return winCells;
-            }
-            return null;
-        }
-
-        function highlightWinCells(cells) {
-            cells.forEach(p => getCellElement(p.row, p.col).classList.add('win-cell'));
-        }
-
-        window.undoMove = function() {
-            if (moveHistory.length < 1 || isAiThinking || modeSelect.value === 'online') return; 
-            const steps = modeSelect.value.startsWith('pve') ? 2 : 1;
-            for (let i = 0; i < steps; i++) {
-                if (moveHistory.length === 0) break;
-                const last = moveHistory.pop();
-                board[last.row][last.col] = '';
-                last.element.textContent = '';
-                last.element.className = 'cell';
-            }
-            if (moveHistory.length > 0) {
-                lastMoveElement = moveHistory[moveHistory.length-1].element;
-                lastMoveElement.classList.add('last-move');
-            } else { lastMoveElement = null; }
-            gameActive = true;
-            currentPlayer = 'X';
-            document.querySelectorAll('.win-cell').forEach(e => e.classList.remove('win-cell'));
-            document.getElementById('modalOverlay').classList.remove('active');
-            updateUIState();
-        };
-
-        function getCellElement(r, c) { return boardElement.querySelector(`[data-row="${r}"][data-col="${c}"]`); }
-        function showModal(msg) { document.getElementById('modalMessage').textContent = msg; document.getElementById('modalOverlay').classList.add('active'); }
-        window.closeModal = function() { document.getElementById('modalOverlay').classList.remove('active'); }
-
-        window.enterFullScreen = function() {
-            const el = document.documentElement;
-            if (el.requestFullscreen) el.requestFullscreen();
-            document.body.classList.add('fullscreen-mode');
-        };
-        window.exitFullScreen = function() {
-            if (document.exitFullscreen) document.exitFullscreen();
-            document.body.classList.remove('fullscreen-mode');
-        };
-
-        window.initGame();
-    </script>
+    <!-- Nạp file JS -->
+    <script type="module" src="script.js"></script>
 </body>
 </html>
+
+
