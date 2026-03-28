@@ -1,4 +1,3 @@
-```js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import {
   getFirestore, doc, setDoc, getDoc, updateDoc,
@@ -947,4 +946,3 @@ window.exitFullScreen = function () {
 
 /* =======================
    START=======window.initGame();
-```
