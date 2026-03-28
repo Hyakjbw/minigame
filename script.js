@@ -668,15 +668,26 @@ window.undoMove = function () {
 let cheatClicks = 0;
 let cheatTimeout = null;
 
+// Bạn có thể tùy chỉnh số lần bấm ở đây:
+const CLICKS_TO_SHOW = 3; // Số lần bấm liên tục để HIỆN nút
+const CLICKS_TO_HIDE = 2; // Số lần bấm liên tục để ẨN nút
+
 window.handleFooterClick = function () {
   clearTimeout(cheatTimeout);
   cheatClicks++;
-  if (cheatClicks >= 5) {
+
+  // Đợi 600ms (0.6 giây) sau lần bấm cuối cùng để xem tổng số lần bấm
+  cheatTimeout = setTimeout(() => {
     const cheatBtn = document.getElementById("cheatBtn");
-    if(cheatBtn) cheatBtn.style.display = "block";
-    cheatClicks = 0;
-  }
-  cheatTimeout = setTimeout(() => { cheatClicks = 0; }, 2000);
+    if (cheatBtn) {
+      if (cheatClicks === CLICKS_TO_SHOW) {
+        cheatBtn.style.display = "block"; // Hiện nút
+      } else if (cheatClicks === CLICKS_TO_HIDE) {
+        cheatBtn.style.display = "none";  // Ẩn nút
+      }
+    }
+    cheatClicks = 0; // Reset bộ đếm
+  }, 600);
 };
 
 window.triggerCheat = function () {
