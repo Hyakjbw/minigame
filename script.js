@@ -67,33 +67,6 @@ const State = {
 };
 
 /* =======================
-   AI: SCORING (GOMOKU)
-======================= */
-const SCORE_WIN = 100000000;
-const SCORE_OPEN_4 = 10000000;
-const SCORE_CLOSED_4 = 1000000;
-const SCORE_OPEN_3 = 500000;
-const SCORE_CLOSED_3 = 10000;
-const SCORE_OPEN_2 = 5000;
-
-const PATTERNS = [
-  { regex: /PPPPP/, score: SCORE_WIN },
-  { regex: /\.PPPP\./, score: SCORE_OPEN_4 },
-  { regex: /BPPPP\./, score: SCORE_CLOSED_4 },
-  { regex: /\.PPPPB/, score: SCORE_CLOSED_4 },
-  { regex: /P\.PPP/, score: SCORE_CLOSED_4 },
-  { regex: /PPP\.P/, score: SCORE_CLOSED_4 },
-  { regex: /PP\.PP/, score: SCORE_CLOSED_4 },
-  { regex: /\.PPP\./, score: SCORE_OPEN_3 },
-  { regex: /\.P\./, score: SCORE_OPEN_3 },
-  { regex: /\.PP\.P\./, score: SCORE_OPEN_3 },
-  { regex: /BPPP\.\./, score: SCORE_CLOSED_3 },
-  { regex: /\.\.PPPB/, score: SCORE_CLOSED_3 },
-  { regex: /\.PP\./, score: SCORE_OPEN_2 },
-  { regex: /\.P\.P\./, score: 500 }
-];
-
-/* =======================
    UTILS
 ======================= */
 function emptyBoard() {
@@ -130,7 +103,7 @@ function showModal(msg) {
    UI
 ======================= */
 function updateUIState() {
-  const mode = modeSelect.value;
+  const mode = modeSelect ? modeSelect.value : "pvp";
 
   if (State.isAiThinking) {
     turnIndicator.textContent = "💻 Máy đang tính...";
@@ -219,27 +192,6 @@ window.initGame = function (keepOnline = false) {
 /* =======================
    WIN CHECK
 ======================= */
-function checkWinOnBoard(board2D, row, col, player) {
-  const directions = [
-    [[0, 1], [0, -1]],
-    [[1, 0], [-1, 0]],
-    [[1, 1], [-1, -1]],
-    [[1, -1], [-1, 1]]
-  ];
-  for (const dir of directions) {
-    let count = 1;
-    for (const [dr, dc] of dir) {
-      let r = row + dr, c = col + dc;
-      while (inBounds(r, c) && board2D[r][c] === player) {
-        count++;
-        r += dr; c += dc;
-      }
-    }
-    if (count >= 5) return true;
-  }
-  return false;
-}
-
 function checkWin(row, col, player) {
   const directions = [
     [[0, 1], [0, -1]],
@@ -318,327 +270,111 @@ function applyMoveLocally(r, c, player) {
 }
 
 /* =======================
-   AI (easy/medium/hard)
+   AI (HEURISTIC SCORING) - GỌN NHẸ MÀ THÔNG MINH
 ======================= */
-function getAxisString(r, c, dr, dc, player, opp) {
-  let str = "";
-  for (let i = -4; i <= 4; i++) {
-    const nr = r + dr * i;
-    const nc = c + dc * i;
-    if (!inBounds(nr, nc)) str += "B";
-    else if (State.board[nr][nc] === player) str += "P";
-    else if (State.board[nr][nc] === opp) str += "B";
-    else str += ".";
-  }
-  return str;
-}
+// Mảng điểm dựa trên số quân cờ liên tiếp (0, 1, 2, 3, 4, 5 quân)
+const ATTACK_SCORES = [0, 4, 27, 256, 3125, 27000];
+const DEFENSE_SCORES = [0, 3, 24, 243, 2197, 19773];
 
-function evaluateLineStr(str) {
-  for (const pat of PATTERNS) {
-    if (pat.regex.test(str)) return pat.score;
-  }
-  return 0;
-}
-
-function evaluateCellPro(r, c, aiSide, oppSide) {
-  let aiScore = 0;
-  let oppScore = 0;
+function getCellScore(r, c, player, opp, isAttack) {
+  let score = 0;
   const dirs = [[0, 1], [1, 0], [1, 1], [1, -1]];
+  const scoreArray = isAttack ? ATTACK_SCORES : DEFENSE_SCORES;
 
-  State.board[r][c] = aiSide;
   for (const [dr, dc] of dirs) {
-    aiScore += evaluateLineStr(getAxisString(r, c, dr, dc, aiSide, oppSide));
-  }
+    let count = 0;
+    let blocks = 0;
 
-  State.board[r][c] = oppSide;
-  for (const [dr, dc] of dirs) {
-    oppScore += evaluateLineStr(getAxisString(r, c, dr, dc, oppSide, aiSide));
-  }
+    // Đếm theo hướng tiến
+    let nr = r + dr, nc = c + dc;
+    while (inBounds(nr, nc) && State.board[nr][nc] === player) {
+      count++;
+      nr += dr; nc += dc;
+    }
+    if (!inBounds(nr, nc) || State.board[nr][nc] === opp) blocks++;
 
-  State.board[r][c] = "";
-  return { aiScore, oppScore, total: aiScore + oppScore * 1.3 };
+    // Đếm theo hướng lùi
+    nr = r - dr; nc = c - dc;
+    while (inBounds(nr, nc) && State.board[nr][nc] === player) {
+      count++;
+      nr -= dr; nc -= dc;
+    }
+    if (!inBounds(nr, nc) || State.board[nr][nc] === opp) blocks++;
+
+    // Bị chặn 2 đầu mà độ dài chưa đạt 4 thì vô dụng -> bỏ qua
+    if (blocks === 2 && count < 4) continue;
+
+    // Tính điểm dựa theo mảng
+    let lineScore = scoreArray[Math.min(count + 1, 5)];
+
+    // Bị chặn 1 đầu thì giảm một nửa giá trị uy hiếp
+    if (blocks === 1) {
+      lineScore /= 2;
+    }
+
+    // Nếu tạo được 4 hoặc 5 quân liên tiếp (sắp thắng) -> Tăng điểm đột biến để chốt hạ
+    if (count >= 4) {
+      lineScore *= 100;
+    }
+
+    score += lineScore;
+  }
+  return score;
 }
 
 function calculateLocalAIMove(difficulty, aiSide) {
   const oppSide = aiSide === "X" ? "O" : "X";
-  const candidates = [];
+  let candidates = [];
+  let isBoardEmpty = true;
 
+  // Lướt qua toàn bộ bàn cờ để tìm ô trống
   for (let r = 0; r < BOARD_SIZE; r++) {
     for (let c = 0; c < BOARD_SIZE; c++) {
-      if (State.board[r][c] !== "") continue;
+      if (State.board[r][c] !== "") {
+        isBoardEmpty = false;
+        continue;
+      }
 
-      let near = false;
-      for (let i = -2; i <= 2 && !near; i++) {
+      // Tối ưu tốc độ: Chỉ xét những ô nằm gần quân cờ khác (Bán kính 2 ô)
+      let isNearPiece = false;
+      for (let i = -2; i <= 2 && !isNearPiece; i++) {
         for (let j = -2; j <= 2; j++) {
-          const nr = r + i, nc = c + j;
-          if (inBounds(nr, nc) && State.board[nr][nc] !== "") { 
-              near = true; 
-              break; 
+          let nr = r + i, nc = c + j;
+          if (inBounds(nr, nc) && State.board[nr][nc] !== "") {
+            isNearPiece = true;
           }
         }
       }
-      if (!near) continue;
+      if (!isNearPiece) continue;
 
-      const ev = evaluateCellPro(r, c, aiSide, oppSide);
-      candidates.push({ r, c, aiScore: ev.aiScore, oppScore: ev.oppScore, score: ev.total });
+      // Cộng dồn điểm tấn công (Tạo thế trận cho AI) và phòng thủ (Chặn đối thủ)
+      let attackPoint = getCellScore(r, c, aiSide, oppSide, true);
+      let defensePoint = getCellScore(r, c, oppSide, aiSide, false);
+      let totalScore = attackPoint + defensePoint;
+
+      candidates.push({ r, c, score: totalScore });
     }
   }
 
-  if (candidates.length === 0) return { r: Math.floor(BOARD_SIZE / 2), c: Math.floor(BOARD_SIZE / 2) };
+  // Nếu bàn cờ trống, đánh vào giữa bàn
+  if (isBoardEmpty || candidates.length === 0) {
+    return { r: Math.floor(BOARD_SIZE / 2), c: Math.floor(BOARD_SIZE / 2) };
+  }
 
+  // Sắp xếp giảm dần theo điểm
   candidates.sort((a, b) => b.score - a.score);
 
+  // Xử lý độ khó
   if (difficulty === "easy") {
+    // Chế độ Dễ: Bốc random 1 trong 8 nước đi tốt nhất
     return candidates[Math.floor(Math.random() * Math.min(8, candidates.length))];
-  }
-  if (difficulty === "medium") {
+  } else if (difficulty === "medium") {
+    // Chế độ Thường: Bốc random 1 trong 3 nước đi tốt nhất
     return candidates[Math.floor(Math.random() * Math.min(3, candidates.length))];
   }
-  // hard
+  
+  // Chế độ Khó & Cực Khó: Luôn đánh nước thông minh nhất
   return candidates[0];
-}
-
-/* =======================
-   AI CỰC KHÓ: Alpha-Beta + Iterative Deepening
-======================= */
-const AI = {
-  MAX_DEPTH: 4,
-  TIME_LIMIT_MS: 450,
-  CANDIDATE_LIMIT: 14,
-  NEAR_DIST: 2,
-};
-const TT = new Map();
-
-function boardKey(board2D, playerToMove) {
-  let s = playerToMove + "|";
-  for (let r = 0; r < BOARD_SIZE; r++) s += board2D[r].join("") + "/";
-  return s;
-}
-
-function getAxisStringOnBoard(board2D, r, c, dr, dc, player, opp) {
-  let str = "";
-  for (let i = -4; i <= 4; i++) {
-    const nr = r + dr * i;
-    const nc = c + dc * i;
-    if (!inBounds(nr, nc)) str += "B";
-    else if (board2D[nr][nc] === player) str += "P";
-    else if (board2D[nr][nc] === opp) str += "B";
-    else str += ".";
-  }
-  return str;
-}
-
-function evaluateCellOnBoard(board2D, r, c, side, opp) {
-  const dirs = [[0,1],[1,0],[1,1],[1,-1]];
-  board2D[r][c] = side;
-  let s = 0;
-  for (const [dr,dc] of dirs) s += evaluateLineStr(getAxisStringOnBoard(board2D, r, c, dr, dc, side, opp));
-  board2D[r][c] = "";
-  return s;
-}
-
-function hasNeighbor(board2D, r, c, dist) {
-  for (let dr = -dist; dr <= dist; dr++) {
-    for (let dc = -dist; dc <= dist; dc++) {
-      if (dr === 0 && dc === 0) continue;
-      const nr = r + dr, nc = c + dc;
-      if (!inBounds(nr, nc)) continue;
-      if (board2D[nr][nc] !== "") return true;
-    }
-  }
-  return false;
-}
-
-function generateCandidates(board2D, side, opp) {
-  const moves = [];
-  let hasAnyStone = false;
-
-  for (let r = 0; r < BOARD_SIZE; r++) {
-    for (let c = 0; c < BOARD_SIZE; c++) {
-      if (board2D[r][c] !== "") { hasAnyStone = true; continue; }
-      if (!hasNeighbor(board2D, r, c, AI.NEAR_DIST)) continue;
-
-      const a = evaluateCellOnBoard(board2D, r, c, side, opp);
-      const d = evaluateCellOnBoard(board2D, r, c, opp, side);
-      const score = a + d * 1.15;
-      moves.push({ r, c, score, a, d });
-    }
-  }
-
-  if (!hasAnyStone) {
-    const mid = Math.floor(BOARD_SIZE / 2);
-    return [{ r: mid, c: mid, score: 0, a: 0, d: 0 }];
-  }
-
-  moves.sort((x, y) => y.score - x.score);
-  return moves.slice(0, AI.CANDIDATE_LIMIT);
-}
-
-function evaluateBoardHeuristic(board2D, aiSide, oppSide) {
-  let ai = 0, opp = 0;
-  const dirs = [[0,1],[1,0],[1,1],[1,-1]];
-
-  for (let r = 0; r < BOARD_SIZE; r++) {
-    for (let c = 0; c < BOARD_SIZE; c++) {
-      if (board2D[r][c] !== "") continue;
-      if (!hasNeighbor(board2D, r, c, 2)) continue;
-
-      board2D[r][c] = aiSide;
-      let s1 = 0;
-      for (const [dr,dc] of dirs) s1 += evaluateLineStr(getAxisStringOnBoard(board2D, r, c, dr, dc, aiSide, oppSide));
-      board2D[r][c] = "";
-
-      board2D[r][c] = oppSide;
-      let s2 = 0;
-      for (const [dr,dc] of dirs) s2 += evaluateLineStr(getAxisStringOnBoard(board2D, r, c, dr, dc, oppSide, aiSide));
-      board2D[r][c] = "";
-
-      ai += s1;
-      opp += s2;
-    }
-  }
-
-  return ai - opp * 1.05;
-}
-
-function alphaBeta(board2D, depth, alpha, beta, playerToMove, aiSide, oppSide, lastMove, deadline) {
-  if (performance.now() > deadline) return { score: 0, timedOut: true };
-
-  const key = boardKey(board2D, playerToMove) + "|d" + depth;
-  const cached = TT.get(key);
-  if (cached && cached.depth >= depth) return { score: cached.score, timedOut: false };
-
-  if (lastMove) {
-    const { r, c, p } = lastMove;
-    if (checkWinOnBoard(board2D, r, c, p)) {
-      const winScore = (p === aiSide) ? SCORE_WIN : -SCORE_WIN;
-      const sc = winScore - (AI.MAX_DEPTH - depth);
-      TT.set(key, { score: sc, depth });
-      return { score: sc, timedOut: false };
-    }
-  }
-
-  if (depth === 0) {
-    const sc = evaluateBoardHeuristic(board2D, aiSide, oppSide);
-    TT.set(key, { score: sc, depth });
-    return { score: sc, timedOut: false };
-  }
-
-  const maximizing = (playerToMove === aiSide);
-  const side = playerToMove;
-  const opp = (side === "X") ? "O" : "X";
-
-  const candidates = generateCandidates(board2D, side, opp);
-
-  let bestScore = maximizing ? -Infinity : Infinity;
-
-  for (const mv of candidates) {
-    if (performance.now() > deadline) return { score: bestScore, timedOut: true };
-
-    board2D[mv.r][mv.c] = side;
-
-    const child = alphaBeta(
-      board2D,
-      depth - 1,
-      alpha,
-      beta,
-      opp,
-      aiSide,
-      oppSide,
-      { r: mv.r, c: mv.c, p: side },
-      deadline
-    );
-
-    board2D[mv.r][mv.c] = "";
-
-    if (child.timedOut) return { score: bestScore, timedOut: true };
-
-    const sc = child.score;
-
-    if (maximizing) {
-      if (sc > bestScore) bestScore = sc;
-      alpha = Math.max(alpha, bestScore);
-      if (alpha >= beta) break;
-    } else {
-      if (sc < bestScore) bestScore = sc;
-      beta = Math.min(beta, bestScore);
-      if (alpha >= beta) break;
-    }
-  }
-
-  TT.set(key, { score: bestScore, depth });
-  return { score: bestScore, timedOut: false };
-}
-
-function calculateLocalAIMoveExtreme(aiSide) {
-  const oppSide = aiSide === "X" ? "O" : "X";
-  const board2D = State.board.map(row => row.slice());
-
-  const quick = generateCandidates(board2D, aiSide, oppSide);
-
-  for (const mv of quick) {
-    board2D[mv.r][mv.c] = aiSide;
-    const win = checkWinOnBoard(board2D, mv.r, mv.c, aiSide);
-    board2D[mv.r][mv.c] = "";
-    if (win) return { r: mv.r, c: mv.c };
-  }
-  for (const mv of quick) {
-    board2D[mv.r][mv.c] = oppSide;
-    const win = checkWinOnBoard(board2D, mv.r, mv.c, oppSide);
-    board2D[mv.r][mv.c] = "";
-    if (win) return { r: mv.r, c: mv.c };
-  }
-
-  const start = performance.now();
-  const deadline = start + AI.TIME_LIMIT_MS;
-
-  let bestMove = quick[0] || { r: Math.floor(BOARD_SIZE / 2), c: Math.floor(BOARD_SIZE / 2) };
-  TT.clear();
-
-  for (let depth = 1; depth <= AI.MAX_DEPTH; depth++) {
-    if (performance.now() > deadline) break;
-
-    let localBestMove = bestMove;
-    let localBestScore = -Infinity;
-    let timedOut = false;
-
-    const rootCandidates = generateCandidates(board2D, aiSide, oppSide);
-
-    for (const mv of rootCandidates) {
-      if (performance.now() > deadline) { timedOut = true; break; }
-
-      board2D[mv.r][mv.c] = aiSide;
-
-      const child = alphaBeta(
-        board2D,
-        depth - 1,
-        -Infinity,
-        Infinity,
-        oppSide,
-        aiSide,
-        oppSide,
-        { r: mv.r, c: mv.c, p: aiSide },
-        deadline
-      );
-
-      board2D[mv.r][mv.c] = "";
-
-      if (child.timedOut) { timedOut = true; break; }
-
-      if (child.score > localBestScore) {
-        localBestScore = child.score;
-        localBestMove = { r: mv.r, c: mv.c };
-      }
-    }
-
-    if (!timedOut) {
-      bestMove = localBestMove;
-    } else {
-      break;
-    }
-  }
-
-  return bestMove;
 }
 
 /* =======================
@@ -665,21 +401,22 @@ function handleCellClick(e) {
   const ok = applyMoveLocally(r, c, State.currentPlayer);
   if (!ok) return;
 
+  // Lượt của Máy
   if (State.gameActive && mode.startsWith("pve") && State.currentPlayer === "O") {
     State.isAiThinking = true;
     updateUIState();
 
     setTimeout(() => {
-      const diff = mode.split("-")[1];
-
-      let move;
-      if (diff === "super") move = calculateLocalAIMoveExtreme("O");
-      else move = calculateLocalAIMove(diff, "O");
+      // Vì đã gộp logic AI, "super" hay "hard" đều sẽ dùng chế độ thông minh nhất
+      let diff = mode.split("-")[1];
+      if(diff === "super") diff = "hard"; 
+      
+      const move = calculateLocalAIMove(diff, "O");
 
       applyMoveLocally(move.r, move.c, "O");
       State.isAiThinking = false;
       updateUIState();
-    }, 50);
+    }, 50); // Delay 50ms cho có cảm giác chờ đợi
   }
 }
 
@@ -953,7 +690,7 @@ window.triggerCheat = function () {
     State.isAiThinking = true;
     updateUIState();
     setTimeout(() => {
-      const move = calculateLocalAIMoveExtreme(State.mySide);
+      const move = calculateLocalAIMove("hard", State.mySide);
       const ok = applyMoveLocally(move.r, move.c, State.mySide);
       if (ok) syncMoveToFirebase(move.r, move.c, State.mySide);
       State.isAiThinking = false;
@@ -963,7 +700,7 @@ window.triggerCheat = function () {
     State.isAiThinking = true;
     updateUIState();
     setTimeout(() => {
-      const move = calculateLocalAIMoveExtreme(State.currentPlayer);
+      const move = calculateLocalAIMove("hard", State.currentPlayer);
       applyMoveLocally(move.r, move.c, State.currentPlayer);
       State.isAiThinking = false;
       updateUIState();
