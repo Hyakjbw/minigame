@@ -648,54 +648,36 @@ window.undoMove = function () {
 };
 
 /* =======================
-   CHEAT (5 CHẠM TẠI DÒNG THÔNG BÁO)
+   CHEAT (HIỆN NGAY LẬP TỨC)
 ======================= */
 let cheatClicks = 0;
 let cheatTimeout = null;
-const CLICKS_TO_SHOW = 5;
-const CLICKS_TO_HIDE = 2;
 
-// Tự tạo nút (phòng trường hợp HTML thiếu nút ID="cheatBtn")
-function createCheatButtonIfNeeded() {
-  let btn = document.getElementById("cheatBtn");
-  if (!btn) {
-    btn = document.createElement("button");
-    btn.id = "cheatBtn";
-    btn.innerHTML = "🤖 Đánh Giúp";
-    btn.style.position = "fixed";
-    btn.style.bottom = "20px";
-    btn.style.right = "20px";
-    btn.style.zIndex = "9999";
-    btn.style.padding = "10px 15px";
-    btn.style.backgroundColor = "#ef4444";
-    btn.style.color = "white";
-    btn.style.border = "none";
-    btn.style.borderRadius = "8px";
-    btn.style.fontWeight = "bold";
-    btn.style.cursor = "pointer";
-    btn.style.boxShadow = "0 4px 6px rgba(0,0,0,0.1)";
-    btn.style.display = "none";
-    btn.onclick = window.triggerCheat;
-    document.body.appendChild(btn);
-  }
-  return btn;
-}
-
-window.handleCheatClick = function () {
+window.handleFooterClick = function () {
   clearTimeout(cheatTimeout);
   cheatClicks++;
   
-  // Nới lỏng thời gian lên 1 giây để dễ ấn đủ 5 lần hơn
+  const cheatBtn = document.getElementById("cheatBtn");
+
+  // Nếu bấm chạm mốc 5 cái -> HIỆN NGAY LẬP TỨC, không cần chờ
+  if (cheatClicks >= 5) {
+    if (cheatBtn) cheatBtn.style.display = "block";
+    cheatClicks = 0; // Hiện xong thì reset đếm
+    return;
+  }
+
+  // Nếu dừng tay không bấm nữa trong 0.5 giây
   cheatTimeout = setTimeout(() => {
-    const btn = createCheatButtonIfNeeded();
-    if (cheatClicks === CLICKS_TO_SHOW) {
-       btn.style.display = "block";
-    } else if (cheatClicks === CLICKS_TO_HIDE) {
-       btn.style.display = "none";
+    // Nếu vừa bấm đúng 2 cái thì ẨN đi
+    if (cheatClicks === 2) {
+      if (cheatBtn) cheatBtn.style.display = "none";
     }
-    cheatClicks = 0;
-  }, 1000); 
+    cheatClicks = 0; // Trả về 0 để đếm lại từ đầu
+  }, 500); 
 };
+
+// Gắn chung hàm này cho chữ Lượt Đi ở trên cùng
+window.handleCheatClick = window.handleFooterClick;
 
 window.triggerCheat = function () {
   if (!State.gameActive || State.isAiThinking) return;
@@ -726,6 +708,34 @@ window.triggerCheat = function () {
     }, 50);
   }
 };
+
+/* =======================
+   MODAL + FULLSCREEN
+======================= */
+window.closeModal = function () { if(modalOverlay) modalOverlay.classList.remove("active"); };
+window.enterFullScreen = function () {
+  const el = document.documentElement;
+  if (el.requestFullscreen) el.requestFullscreen();
+  document.body.classList.add("fullscreen-mode");
+};
+window.exitFullScreen = function () {
+  if (document.exitFullscreen) document.exitFullscreen();
+  document.body.classList.remove("fullscreen-mode");
+};
+
+/* =======================
+   START 
+======================= */
+document.addEventListener("DOMContentLoaded", () => {
+   buildBoardDOM();
+   window.initGame();
+   
+   // Gắn sự kiện click vào chữ Lượt Đi
+   if (turnIndicator) {
+      turnIndicator.addEventListener("click", window.handleCheatClick);
+      turnIndicator.style.cursor = "pointer"; 
+   }
+});
 
 /* =======================
    MODAL + FULLSCREEN
