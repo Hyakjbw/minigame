@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import {
   getFirestore, doc, setDoc, getDoc, updateDoc,
-  onSnapshot, collection, query, where
+  onSnapshot, collection, query, where, deleteDoc
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
 /* =======================
@@ -71,18 +71,17 @@ const State = {
 };
 
 /* =======================
-   TẠO GIAO DIỆN CHAT & REMATCH BẰNG JS
+   TẠO GIAO DIỆN CHAT, REMATCH & EXIT BẰNG JS
 ======================= */
 function injectOnlineUI() {
   if (document.getElementById("inGameUI")) return;
 
   const style = document.createElement("style");
   style.innerHTML = `
-      #inGameUI { display: none; justify-content: center; gap: 10px; margin-top: 15px; width: 100%; transition: 0.3s; }
+      #inGameUI { display: none; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: 15px; width: 100%; transition: 0.3s; }
       .chat-panel { display: none; position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%); width: 340px; background: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); z-index: 1000; flex-direction: column; overflow: hidden; border: 1px solid #cbd5e1; }
       .chat-messages { height: 220px; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; background: #f8fafc; scroll-behavior: smooth; }
       
-      /* Cập nhật khu vực chứa Emote để tự xuống dòng, có thanh cuộn nếu quá nhiều */
       .emote-row { display: flex; flex-wrap: wrap; gap: 10px; padding: 10px; background: #e2e8f0; justify-content: center; font-size: 1.5rem; max-height: 95px; overflow-y: auto; }
       .emote-btn { cursor: pointer; transition: transform 0.2s; user-select: none; padding: 2px; }
       .emote-btn:hover { transform: scale(1.3); }
@@ -101,9 +100,10 @@ function injectOnlineUI() {
   const inGameUI = document.createElement("div");
   inGameUI.id = "inGameUI";
   inGameUI.innerHTML = `
-      <button id="btnInGameRematch" class="btn-action" style="background:#f59e0b; color:white; border:none;" onclick="window.requestRematch()">🔄 Gạ Chơi Lại</button>
+      <button class="btn-action" style="background:#ef4444; color:white; border:none;" onclick="window.leaveRoom()">🚪 Thoát</button>
+      <button id="btnInGameRematch" class="btn-action" style="background:#f59e0b; color:white; border:none;" onclick="window.requestRematch()">🔄 Chơi Lại</button>
       <button class="btn-action" style="background:#3b82f6; color:white; border:none; position:relative;" onclick="window.toggleChat()">
-        💬 Trò Chuyện 
+        💬 Chat 
         <span id="chatNotif" style="display:none; position:absolute; top:-5px; right:-5px; background:red; color:white; border-radius:50%; width:18px; height:18px; font-size:11px; line-height:18px; text-align:center;">!</span>
       </button>
   `;
@@ -152,6 +152,67 @@ window.showToast = function(msg) {
   toast.classList.add("show");
   setTimeout(() => toast.classList.remove("show"), 3500);
 }
+
+/* =======================
+   THOÁT PHÒNG & XÓA PHÒNG
+======================= */
+window.leaveRoom = async function() {
+    if (State.currentRoomId && State.mySide && db) {
+        const roomRef = doc(db, "rooms", State.currentRoomId);
+        try {
+            const snap = await getDoc(roomRef);
+            if (snap.exists()) {
+                const data = snap.data();
+                let pX = data.playerX;
+                let pO = data.playerO;
+                
+                // Gỡ tên mình ra khỏi ghế
+                if (State.mySide === "X") pX = "";
+                if (State.mySide === "O") pO = "";
+
+                if (pX === "" && pO === "") {
+                    // Nếu cả 2 ghế đều trống -> Hủy diệt phòng này khỏi Firebase luôn!
+                    await deleteDoc(roomRef);
+                } else {
+                    // Nếu người kia vẫn còn ở lại -> Báo cho họ biết mình đã out
+                    await updateDoc(roomRef, {
+                        playerX: pX,
+                        playerO: pO,
+                        lastActive: Date.now()
+                    });
+                }
+            }
+        } catch (e) {
+            console.error("Lỗi khi thoát phòng", e);
+        }
+    }
+    window.showToast("Đã rời phòng!");
+    if (modeSelect) modeSelect.value = "pvp";
+    window.handleModeChange();
+};
+
+// Cứu cánh cuối cùng: Bắt sự kiện khi người dùng nhấn X tắt tab hoặc F5
+window.addEventListener("beforeunload", (e) => {
+    if (modeSelect && modeSelect.value === "online" && State.currentRoomId && State.mySide && db) {
+        // Trình duyệt đang tắt, gọi lệnh hỏa tốc (không await được)
+        const roomRef = doc(db, "rooms", State.currentRoomId);
+        getDoc(roomRef).then(snap => {
+            if (snap.exists()) {
+                const data = snap.data();
+                let pX = data.playerX;
+                let pO = data.playerO;
+                if (State.mySide === "X") pX = "";
+                if (State.mySide === "O") pO = "";
+
+                if (pX === "" && pO === "") {
+                    deleteDoc(roomRef); // Cả 2 đều out
+                } else {
+                    updateDoc(roomRef, { playerX: pX, playerO: pO }); // Người kia còn
+                }
+            }
+        }).catch(()=>{});
+    }
+});
 
 /* =======================
    UTILS
@@ -245,7 +306,7 @@ function resetLocalGame(keepOnline = false) {
   
   const rematchBtn = document.getElementById("btnInGameRematch");
   if (rematchBtn) {
-      rematchBtn.innerHTML = "🔄 Gạ Chơi Lại";
+      rematchBtn.innerHTML = "🔄 Chơi Lại";
       rematchBtn.classList.remove("pulse-btn");
   }
 
@@ -402,15 +463,24 @@ function calculateLocalAIMove(difficulty, aiSide) {
       }
       if (!isNearPiece) continue;
 
-      let totalScore = (evaluateCellMaster(r, c, aiSide) * 1.05) + evaluateCellMaster(r, c, oppSide) + (20 - (Math.abs(r - BOARD_SIZE/2) + Math.abs(c - BOARD_SIZE/2)));
-      candidates.push({ r, c, score: totalScore });
+      let attackScore = evaluateCellMaster(r, c, aiSide);
+      let defenseScore = evaluateCellMaster(r, c, oppSide);
+      let centerBias = 20 - (Math.abs(r - BOARD_SIZE/2) + Math.abs(c - BOARD_SIZE/2));
+      let totalScore = (attackScore * 1.05) + defenseScore + centerBias;
+
+      candidates.push({ r, c, score: totalScore, attackScore });
     }
   }
 
-  if (isBoardEmpty || candidates.length === 0) return { r: Math.floor(BOARD_SIZE / 2), c: Math.floor(BOARD_SIZE / 2) };
+  if (isBoardEmpty || candidates.length === 0) {
+    return { r: Math.floor(BOARD_SIZE / 2), c: Math.floor(BOARD_SIZE / 2) };
+  }
+
   candidates.sort((a, b) => b.score - a.score);
+
   if (difficulty === "easy") return candidates[Math.floor(Math.random() * Math.min(6, candidates.length))];
   if (difficulty === "medium") return candidates[Math.floor(Math.random() * Math.min(2, candidates.length))];
+  
   return candidates[0];
 }
 
@@ -509,6 +579,7 @@ window.joinOrCreateRoom = async function () {
       let pX = data.playerX;
       let pO = data.playerO;
 
+      // Xóa người chơi nếu phòng bỏ hoang > 30 phút
       if (!data.lastActive || (now - data.lastActive > 30 * 60 * 1000)) { pX = ""; pO = ""; }
 
       if (pX === "" && pO === "") {
@@ -541,11 +612,25 @@ window.joinOrCreateRoom = async function () {
 function listenToRoom(roomRef) {
   if (State.unsubscribeRoom) State.unsubscribeRoom();
   State.unsubscribeRoom = onSnapshot(roomRef, (snap) => {
-    if (!snap.exists()) return;
+    if (!snap.exists()) {
+        // Nếu phòng bị xóa (do cả 2 người leaveRoom)
+        if (State.currentRoomId && modeSelect.value === "online") {
+            window.showToast("Phòng đã bị xóa do không còn ai!");
+            window.initGame();
+        }
+        return;
+    }
     const data = snap.data();
 
+    // Check xem đối thủ có out không
+    let isOpponentHere = (State.mySide === "X" && data.playerO !== "") || (State.mySide === "O" && data.playerX !== "");
     if (data.playerX && data.playerO !== "" && roomStatus) {
       roomStatus.innerHTML = `Đang thi đấu: <b>${State.currentRoomId.replace("room_", "")}</b><br>(Bạn là quân ${State.mySide})`;
+    } else if (roomStatus) {
+      roomStatus.innerHTML = `Vào phòng: <span style="color:#2563eb; font-size:1.1rem">${State.currentRoomId.replace("room_", "")}</span><br>Bạn là Quân ${State.mySide}. Đang đợi...`;
+      if (!isOpponentHere && State.gameActive === false && State.currentRoomId) {
+          window.showToast("Đối thủ đã rời phòng!");
+      }
     }
 
     // Xử lý Gạ Chơi Lại (Có Timeout)
@@ -563,7 +648,7 @@ function listenToRoom(roomRef) {
     } else {
         State.opponentRequestedRematch = false;
         if(btnRematch) {
-            btnRematch.innerHTML = "🔄 Gạ Chơi Lại";
+            btnRematch.innerHTML = "🔄 Chơi Lại";
             btnRematch.classList.remove("pulse-btn");
         }
     }
