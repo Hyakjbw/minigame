@@ -30,21 +30,23 @@ try {
 }
 
 /* =======================
-   XÁC THỰC FIREBASE (THAY THẾ LOCAL UID)
+   XÁC THỰC FIREBASE
 ======================= */
 let myLocalUid = ""; 
 
-// Bắt đầu đăng nhập ẩn danh ngay khi tải trang
 if (auth) {
-  signInAnonymously(auth)
-    .then((userCredential) => {
-      // Firebase tự động cấp 1 UID hợp lệ và siêu bảo mật
-      myLocalUid = userCredential.user.uid; 
-      console.log("Đã kết nối an toàn với ID:", myLocalUid);
-    })
-    .catch((error) => {
-      console.error("Lỗi cấp quyền Firebase:", error);
-    });
+  // Lắng nghe trạng thái đăng nhập, kể cả khi F5 tải lại trang
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      myLocalUid = user.uid;
+      console.log("Firebase đã cấp UID hợp lệ:", myLocalUid);
+    } else {
+      // Nếu chưa có, yêu cầu Firebase cấp mới
+      signInAnonymously(auth).catch((error) => {
+        console.error("Lỗi đăng nhập ẩn danh:", error);
+      });
+    }
+  });
 }
 
 /* =======================
