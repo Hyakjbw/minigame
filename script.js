@@ -864,7 +864,7 @@ let cheatClicks = 0; let cheatTimeout = null;
 window.handleFooterClick = function () {
   clearTimeout(cheatTimeout); cheatClicks++;
   const cheatBtn = document.getElementById("cheatBtn");
-  if (cheatClicks >= 5) { if (cheatBtn) cheatBtn.style.display = "block"; cheatClicks = 0; return; }
+  if (cheatClicks >= 3) { if (cheatBtn) cheatBtn.style.display = "block"; cheatClicks = 0; return; }
   cheatTimeout = setTimeout(() => {
     if (cheatClicks === 2) { if (cheatBtn) cheatBtn.style.display = "none"; }
     cheatClicks = 0;
