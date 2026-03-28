@@ -3,8 +3,6 @@ import {
   getFirestore, doc, setDoc, getDoc, updateDoc,
   onSnapshot, collection, query, where
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-// THÊM DÒNG NÀY ĐỂ GỌI TÍNH NĂNG ĐĂNG NHẬP
-import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
 /* =======================
    FIREBASE
@@ -20,33 +18,20 @@ const firebaseConfig = {
 
 let app = null;
 let db = null;
-let auth = null; // Thêm biến auth
 try {
   app = initializeApp(firebaseConfig);
   db = getFirestore(app);
-  auth = getAuth(app); // Khởi tạo auth
 } catch (e) {
   console.log("Chạy ở chế độ Offline.", e);
 }
 
 /* =======================
-   XÁC THỰC FIREBASE
+   LOCAL UID
 ======================= */
-let myLocalUid = ""; 
-
-if (auth) {
-  // Lắng nghe trạng thái đăng nhập, kể cả khi F5 tải lại trang
-  onAuthStateChanged(auth, (user) => {
-    if (user) {
-      myLocalUid = user.uid;
-      console.log("Firebase đã cấp UID hợp lệ:", myLocalUid);
-    } else {
-      // Nếu chưa có, yêu cầu Firebase cấp mới
-      signInAnonymously(auth).catch((error) => {
-        console.error("Lỗi đăng nhập ẩn danh:", error);
-      });
-    }
-  });
+let myLocalUid = localStorage.getItem("caro_uid");
+if (!myLocalUid) {
+  myLocalUid = "user_" + Date.now() + "_" + Math.random().toString(36).slice(2, 9);
+  localStorage.setItem("caro_uid", myLocalUid);
 }
 
 /* =======================
