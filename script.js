@@ -5,7 +5,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
 /* =======================
-   FIREBASE
+   FIREBASE CONFIG
 ======================= */
 const firebaseConfig = {
   apiKey: "AIzaSyAVEiHOD1xTnlAFW3h-YjmQcHPsx4saaLo",
@@ -35,42 +35,14 @@ const AudioSys = {
         try {
             this.init();
             if (this.ctx.state === 'suspended') this.ctx.resume();
-            const osc = this.ctx.createOscillator();
-            const gain = this.ctx.createGain();
+            const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
             osc.connect(gain); gain.connect(this.ctx.destination);
             const now = this.ctx.currentTime;
             
-            if (type === 'click') { // Tiếng đặt cờ đanh gọn
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(600, now);
-                osc.frequency.exponentialRampToValueAtTime(300, now + 0.1);
-                gain.gain.setValueAtTime(0.3, now);
-                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-                osc.start(now); osc.stop(now + 0.1);
-            } else if (type === 'ting') { // Tiếng tin nhắn mới
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(1200, now);
-                gain.gain.setValueAtTime(0.3, now);
-                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
-                osc.start(now); osc.stop(now + 0.3);
-            } else if (type === 'win') { // Nhạc chiến thắng
-                osc.type = 'triangle';
-                osc.frequency.setValueAtTime(400, now);
-                osc.frequency.setValueAtTime(523.25, now + 0.15); // C -> E
-                osc.frequency.setValueAtTime(659.25, now + 0.3);  // E -> G
-                osc.frequency.setValueAtTime(1046.50, now + 0.45); // G -> C cao
-                gain.gain.setValueAtTime(0.3, now);
-                gain.gain.linearRampToValueAtTime(0, now + 0.8);
-                osc.start(now); osc.stop(now + 0.8);
-            } else if (type === 'lose') { // Nhạc thua cuộc
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(300, now);
-                osc.frequency.setValueAtTime(250, now + 0.3);
-                osc.frequency.setValueAtTime(200, now + 0.6);
-                gain.gain.setValueAtTime(0.2, now);
-                gain.gain.linearRampToValueAtTime(0, now + 1);
-                osc.start(now); osc.stop(now + 1);
-            }
+            if (type === 'click') { osc.type = 'sine'; osc.frequency.setValueAtTime(600, now); osc.frequency.exponentialRampToValueAtTime(300, now + 0.1); gain.gain.setValueAtTime(0.3, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1); osc.start(now); osc.stop(now + 0.1); }
+            else if (type === 'ting') { osc.type = 'sine'; osc.frequency.setValueAtTime(1200, now); gain.gain.setValueAtTime(0.3, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3); osc.start(now); osc.stop(now + 0.3); }
+            else if (type === 'win') { osc.type = 'triangle'; osc.frequency.setValueAtTime(400, now); osc.frequency.setValueAtTime(523.25, now + 0.15); osc.frequency.setValueAtTime(659.25, now + 0.3); osc.frequency.setValueAtTime(1046.50, now + 0.45); gain.gain.setValueAtTime(0.3, now); gain.gain.linearRampToValueAtTime(0, now + 0.8); osc.start(now); osc.stop(now + 0.8); }
+            else if (type === 'lose') { osc.type = 'sawtooth'; osc.frequency.setValueAtTime(300, now); osc.frequency.setValueAtTime(250, now + 0.3); osc.frequency.setValueAtTime(200, now + 0.6); gain.gain.setValueAtTime(0.2, now); gain.gain.linearRampToValueAtTime(0, now + 1); osc.start(now); osc.stop(now + 1); }
         } catch(e){}
     }
 };
@@ -79,10 +51,7 @@ const AudioSys = {
    LOCAL UID & STATE
 ======================= */
 let myLocalUid = localStorage.getItem("caro_uid");
-if (!myLocalUid) {
-  myLocalUid = "user_" + Date.now() + "_" + Math.random().toString(36).slice(2, 9);
-  localStorage.setItem("caro_uid", myLocalUid);
-}
+if (!myLocalUid) { myLocalUid = "user_" + Date.now() + "_" + Math.random().toString(36).slice(2, 9); localStorage.setItem("caro_uid", myLocalUid); }
 
 const BOARD_SIZE = 20;
 const boardElement = document.getElementById("board");
@@ -94,17 +63,11 @@ const modalOverlay = document.getElementById("modalOverlay");
 const modalMessage = document.getElementById("modalMessage");
 
 const State = {
-  board: [], moveHistory: [], currentPlayer: "X", gameActive: true,
-  lastMoveElement: null, isAiThinking: false,
-
-  currentRoomId: null, mySide: null,
-  unsubscribeRoom: null, unsubscribeRooms: null,
-  currentResetSignal: 0,
-  
-  opponentRequestedRematch: false, lastChatId: 0, heartbeatInterval: null,
-  
-  // Biến lưu tên hiển thị
-  myName: "Bạn", oppName: "Đối thủ"
+  board: [], moveHistory: [], currentPlayer: "X", gameActive: true, lastMoveElement: null, isAiThinking: false,
+  currentRoomId: null, mySide: null, unsubscribeRoom: null, unsubscribeRooms: null, currentResetSignal: 0,
+  opponentRequestedRematch: false, swapRequested: false, lastChatId: 0, heartbeatInterval: null,
+  myName: "Bạn", oppName: "Đối thủ", isSpectator: false,
+  scoreX: 0, scoreO: 0, uidX: "", uidO: "", processedWinner: false
 };
 
 /* =======================
@@ -113,14 +76,13 @@ const State = {
 function injectDynamicUI() {
   const style = document.createElement("style");
   style.innerHTML = `
-      /* --- DARK MODE STYLES --- */
       body.dark-mode { background-color: #0f172a; color: #f8fafc; }
       body.dark-mode .board-wrapper { background-color: #1e293b; border-color: #334155; box-shadow: 3px 6px 15px rgba(0,0,0,0.6); }
       body.dark-mode .cell { background-color: #1e293b; color: #f8fafc; }
       body.dark-mode .cell:hover { background-color: #334155; }
       body.dark-mode .board { background-color: #475569; border-color: #475569; }
       body.dark-mode header h1 { color: #f8fafc; }
-      body.dark-mode .controls, body.dark-mode #onlinePanel, body.dark-mode .turn-indicator { background: #1e293b; border-color: #334155; color: #f8fafc; box-shadow: 0 4px 6px rgba(0,0,0,0.4); }
+      body.dark-mode .controls, body.dark-mode #onlinePanel, body.dark-mode .turn-indicator, body.dark-mode #scoreBoard { background: #1e293b; border-color: #334155; color: #f8fafc; box-shadow: 0 4px 6px rgba(0,0,0,0.4); }
       body.dark-mode select, body.dark-mode input, body.dark-mode .btn-action { background: #334155; color: #f8fafc; border-color: #475569; }
       body.dark-mode .chat-panel { background: #1e293b; border-color: #334155; }
       body.dark-mode .chat-messages { background: #0f172a; }
@@ -132,7 +94,6 @@ function injectDynamicUI() {
       #darkModeBtn { position: fixed; top: 15px; left: 15px; background: white; border: 2px solid #cbd5e1; border-radius: 50%; width: 45px; height: 45px; font-size: 1.5rem; cursor: pointer; z-index: 1000; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition:0.3s; display:flex; justify-content:center; align-items:center; }
       body.dark-mode #darkModeBtn { background: #334155; border-color: #475569; }
 
-      /* --- IN GAME UI --- */
       #inGameUI { display: none; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: 15px; width: 100%; transition: 0.3s; }
       .chat-panel { display: none; position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%); width: 340px; background: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); z-index: 1000; flex-direction: column; overflow: hidden; border: 1px solid #cbd5e1; }
       .chat-messages { height: 220px; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; background: #f8fafc; scroll-behavior: smooth; }
@@ -142,69 +103,62 @@ function injectDynamicUI() {
       .chat-msg { max-width: 85%; padding: 8px 12px; border-radius: 15px; font-size: 0.95rem; word-wrap: break-word; font-weight: 500;}
       .chat-mine { background: #bfdbfe; color: #1e3a8a; align-self: flex-end; border-bottom-right-radius: 2px; }
       .chat-theirs { background: #e2e8f0; color: #334155; align-self: flex-start; border-bottom-left-radius: 2px; }
+      .chat-sys { background: transparent; color: #64748b; font-size: 0.8rem; text-align: center; align-self: center; font-style: italic; padding: 2px; }
       .pulse-btn { animation: pulseWarning 1s infinite alternate !important; background-color: #ef4444 !important; }
       @keyframes pulseWarning { from { transform: scale(1); box-shadow: 0 0 0 rgba(239, 68, 68, 0.4); } to { transform: scale(1.05); box-shadow: 0 0 15px rgba(239, 68, 68, 0.8); } }
       .toast-msg { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(30, 41, 59, 0.9); color: white; padding: 10px 20px; border-radius: 30px; font-weight: bold; z-index: 9999; opacity: 0; transition: 0.3s; pointer-events: none; }
       .toast-msg.show { opacity: 1; top: 50px; }
+
+      /* Tỉ số */
+      #scoreBoard { display: none; background: white; padding: 5px 15px; border-radius: 20px; margin-bottom: 10px; font-weight: bold; border: 2px solid #cbd5e1; color: #334155; box-shadow: 0 2px 4px rgba(0,0,0,0.05); align-items: center; gap: 10px; }
+      .score-badge { padding: 2px 8px; border-radius: 10px; color: white; font-size: 0.9rem; }
+      .score-x { background-color: var(--x-color); }
+      .score-o { background-color: var(--o-color); }
   `;
   document.head.appendChild(style);
 
-  // Nút Dark Mode
-  const darkModeBtn = document.createElement("button");
-  darkModeBtn.id = "darkModeBtn";
+  const darkModeBtn = document.createElement("button"); darkModeBtn.id = "darkModeBtn";
   darkModeBtn.innerHTML = localStorage.getItem("caro_dark") === "1" ? "☀️" : "🌙";
   darkModeBtn.onclick = () => {
-      AudioSys.play('click');
-      const isDark = document.body.classList.toggle("dark-mode");
-      localStorage.setItem("caro_dark", isDark ? "1" : "0");
-      darkModeBtn.innerHTML = isDark ? "☀️" : "🌙";
+      AudioSys.play('click'); const isDark = document.body.classList.toggle("dark-mode");
+      localStorage.setItem("caro_dark", isDark ? "1" : "0"); darkModeBtn.innerHTML = isDark ? "☀️" : "🌙";
   };
   document.body.appendChild(darkModeBtn);
   if (localStorage.getItem("caro_dark") === "1") document.body.classList.add("dark-mode");
 
-  // Chèn ô Nhập Tên vào Panel Online
   const oPanel = document.getElementById("onlinePanel");
   if (oPanel) {
-      const nameInput = document.createElement("input");
-      nameInput.type = "text"; nameInput.id = "playerNameInput";
-      nameInput.placeholder = "Biệt danh của bạn (Không bắt buộc)";
-      nameInput.maxLength = 15;
+      const nameInput = document.createElement("input"); nameInput.type = "text"; nameInput.id = "playerNameInput";
+      nameInput.placeholder = "Biệt danh của bạn (Không bắt buộc)"; nameInput.maxLength = 15;
       nameInput.style.width = "100%"; nameInput.style.marginBottom = "8px"; nameInput.style.boxSizing = "border-box";
       nameInput.value = localStorage.getItem("caro_name") || "";
       nameInput.onchange = (e) => localStorage.setItem("caro_name", e.target.value.trim());
-      
-      const titleDiv = oPanel.querySelector("div"); 
-      if(titleDiv) oPanel.insertBefore(nameInput, titleDiv.nextSibling.nextSibling);
+      const titleDiv = oPanel.querySelector("div"); if(titleDiv) oPanel.insertBefore(nameInput, titleDiv.nextSibling.nextSibling);
   }
 
-  // Toolbar Trong Game
-  const inGameUI = document.createElement("div");
-  inGameUI.id = "inGameUI";
+  // Chèn bảng tỉ số
+  const scoreBoard = document.createElement("div");
+  scoreBoard.id = "scoreBoard";
+  scoreBoard.innerHTML = `🏆 Tỉ số: <span id="scoreTextX" class="score-badge score-x">Bạn (X): 0</span> - <span id="scoreTextO" class="score-badge score-o">Đối thủ (O): 0</span>`;
+  const statusBar = document.querySelector(".status-bar");
+  if(statusBar) statusBar.insertBefore(scoreBoard, turnIndicator);
+
+  const inGameUI = document.createElement("div"); inGameUI.id = "inGameUI";
   inGameUI.innerHTML = `
       <button class="btn-action" style="background:#ef4444; color:white; border:none;" onclick="window.leaveRoom()">🚪 Thoát</button>
-      <button id="btnInGameRematch" class="btn-action" style="background:#f59e0b; color:white; border:none;" onclick="window.requestRematch()">🔄 Chơi Lại</button>
-      <button class="btn-action" style="background:#3b82f6; color:white; border:none; position:relative;" onclick="window.toggleChat()">
-        💬 Chat 
-        <span id="chatNotif" style="display:none; position:absolute; top:-5px; right:-5px; background:red; color:white; border-radius:50%; width:18px; height:18px; font-size:11px; line-height:18px; text-align:center;">!</span>
-      </button>
+      <button id="btnInGameSwap" class="btn-action spectator-hide" style="background:#8b5cf6; color:white; border:none;" onclick="window.requestSwap()">🎲 Đổi Bên</button>
+      <button id="btnInGameRematch" class="btn-action spectator-hide" style="background:#f59e0b; color:white; border:none;" onclick="window.requestRematch()">🔄 Chơi Lại</button>
+      <button class="btn-action" style="background:#3b82f6; color:white; border:none; position:relative;" onclick="window.toggleChat()">💬 Chat <span id="chatNotif" style="display:none; position:absolute; top:-5px; right:-5px; background:red; color:white; border-radius:50%; width:18px; height:18px; font-size:11px; line-height:18px; text-align:center;">!</span></button>
   `;
   document.querySelector("header").appendChild(inGameUI);
 
-  // Sinh HTML cho kho Emote
   const emotes = ['🤣','😡','😢','🏳️','👏','👍','👎','🤔','😎','😭','🤬','🤯','💩','👻','🤡','❤️','🔥','😴'];
   const emotesHTML = emotes.map(e => `<span class="emote-btn" onclick="window.sendChat('${e}')">${e}</span>`).join('');
 
-  // Chat Panel
-  const chatPanel = document.createElement("div");
-  chatPanel.id = "chatPanel";
-  chatPanel.className = "chat-panel";
+  const chatPanel = document.createElement("div"); chatPanel.id = "chatPanel"; chatPanel.className = "chat-panel";
   chatPanel.innerHTML = `
-      <div style="background: #3b82f6; color: white; padding: 10px; font-weight: bold; text-align: center; display:flex; justify-content:space-between; align-items:center;">
-         <span>Kênh Trò Chuyện</span>
-         <span onclick="window.toggleChat()" style="cursor:pointer; font-size:1.2rem;">✖</span>
-      </div>
-      <div id="chatMessages" class="chat-messages"></div>
-      <div class="emote-row">${emotesHTML}</div>
+      <div style="background: #3b82f6; color: white; padding: 10px; font-weight: bold; text-align: center; display:flex; justify-content:space-between; align-items:center;"><span>Kênh Trò Chuyện</span><span onclick="window.toggleChat()" style="cursor:pointer; font-size:1.2rem;">✖</span></div>
+      <div id="chatMessages" class="chat-messages"></div><div class="emote-row">${emotesHTML}</div>
       <div style="display: flex; border-top: 1px solid #cbd5e1; background:white;">
           <input type="text" id="chatInput" placeholder="Nhắn gì đó..." style="flex: 1; border: none; padding: 12px; outline: none; background:transparent;">
           <button onclick="window.sendTextChat()" style="border: none; background: #10b981; color: white; padding: 0 20px; cursor: pointer; font-weight: bold;">Gửi</button>
@@ -212,17 +166,12 @@ function injectDynamicUI() {
   `;
   document.body.appendChild(chatPanel);
 
-  // Toast
-  const toast = document.createElement("div");
-  toast.id = "gameToast"; toast.className = "toast-msg";
-  document.body.appendChild(toast);
-  
+  const toast = document.createElement("div"); toast.id = "gameToast"; toast.className = "toast-msg"; document.body.appendChild(toast);
   document.getElementById("chatInput").addEventListener("keypress", function(e) { if (e.key === "Enter") window.sendTextChat(); });
 }
 
 window.showToast = function(msg) {
-  const toast = document.getElementById("gameToast");
-  if (!toast) return;
+  const toast = document.getElementById("gameToast"); if (!toast) return;
   toast.textContent = msg; toast.classList.add("show");
   setTimeout(() => toast.classList.remove("show"), 3500);
 }
@@ -239,23 +188,30 @@ function startHeartbeat() {
     }, 5 * 60 * 1000); 
 }
 
-function stopHeartbeat() {
-    if(State.heartbeatInterval) { clearInterval(State.heartbeatInterval); State.heartbeatInterval = null; }
-}
+function stopHeartbeat() { if(State.heartbeatInterval) { clearInterval(State.heartbeatInterval); State.heartbeatInterval = null; } }
 
 window.leaveRoom = async function() {
     AudioSys.play('click');
-    if (State.currentRoomId && State.mySide && db) {
+    if (State.currentRoomId && db) {
         const roomRef = doc(db, "rooms", State.currentRoomId);
         try {
-            const snap = await getDoc(roomRef);
-            if (snap.exists()) {
-                const data = snap.data();
-                let pX = data.playerX; let pO = data.playerO;
-                if (State.mySide === "X") pX = ""; if (State.mySide === "O") pO = "";
+            if (State.isSpectator) {
+                 window.sendChat("👋 Khán giả đã rời đi.", true);
+            } else {
+                const snap = await getDoc(roomRef);
+                if (snap.exists()) {
+                    const data = snap.data();
+                    let pX = data.playerX; let pO = data.playerO;
+                    if (State.mySide === "X") pX = ""; if (State.mySide === "O") pO = "";
 
-                if (pX === "" && pO === "") await deleteDoc(roomRef); 
-                else await updateDoc(roomRef, { playerX: pX, playerO: pO, lastActive: Date.now() });
+                    if (pX === "" && pO === "") {
+                        await deleteDoc(roomRef); 
+                    } else {
+                        // Reset tỉ số về 0 khi có 1 người chơi chính thoat
+                        await updateDoc(roomRef, { playerX: pX, playerO: pO, lastActive: Date.now(), scoreX: 0, scoreO: 0 });
+                        window.sendChat("👋 Đối thủ đã rời phòng.", true);
+                    }
+                }
             }
         } catch (e) { console.error("Lỗi khi thoát", e); }
     }
@@ -264,112 +220,92 @@ window.leaveRoom = async function() {
 };
 
 window.addEventListener("beforeunload", (e) => {
-    if (modeSelect && modeSelect.value === "online" && State.currentRoomId && State.mySide && db) {
+    if (modeSelect && modeSelect.value === "online" && State.currentRoomId && !State.isSpectator && db) {
         const roomRef = doc(db, "rooms", State.currentRoomId);
         getDoc(roomRef).then(snap => {
             if (snap.exists()) {
                 const data = snap.data();
                 let pX = data.playerX; let pO = data.playerO;
                 if (State.mySide === "X") pX = ""; if (State.mySide === "O") pO = "";
-                if (pX === "" && pO === "") deleteDoc(roomRef); else updateDoc(roomRef, { playerX: pX, playerO: pO });
+                if (pX === "" && pO === "") deleteDoc(roomRef); 
+                else updateDoc(roomRef, { playerX: pX, playerO: pO, scoreX: 0, scoreO: 0 });
             }
         }).catch(()=>{});
     }
 });
 
 /* =======================
-   UTILS
+   UTILS & RENDER
 ======================= */
 function emptyBoard() { return Array.from({ length: BOARD_SIZE }, () => Array(BOARD_SIZE).fill("")); }
 function inBounds(r, c) { return r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE; }
 function flattenBoard2D(b2) { return b2.flat(); }
-function unflattenTo2D(board1D) {
-  const b = emptyBoard();
-  for (let i = 0; i < BOARD_SIZE * BOARD_SIZE; i++) b[Math.floor(i / BOARD_SIZE)][i % BOARD_SIZE] = board1D[i] || "";
-  return b;
-}
+function unflattenTo2D(board1D) { const b = emptyBoard(); for (let i = 0; i < BOARD_SIZE * BOARD_SIZE; i++) b[Math.floor(i / BOARD_SIZE)][i % BOARD_SIZE] = board1D[i] || ""; return b; }
 function indexOfMove(r, c) { return r * BOARD_SIZE + c; }
 function rcFromIndex(idx) { return { r: Math.floor(idx / BOARD_SIZE), c: idx % BOARD_SIZE }; }
 function getCellElement(r, c) { return boardElement.querySelector(`[data-row="${r}"][data-col="${c}"]`); }
 function showModal(msg) { modalMessage.innerHTML = msg; modalOverlay.classList.add("active"); }
 
-/* =======================
-   UI CẬP NHẬT
-======================= */
 function updateUIState() {
   const mode = modeSelect ? modeSelect.value : "pvp";
   const inGameUI = document.getElementById("inGameUI");
+  const scoreBoard = document.getElementById("scoreBoard");
 
   if (mode === "online" && State.currentRoomId) {
       if (inGameUI) inGameUI.style.display = "flex";
+      if (scoreBoard && !State.isSpectator) scoreBoard.style.display = "flex";
+      else if(scoreBoard) scoreBoard.style.display = "none";
+      
+      // Ẩn nút gạ chơi lại / đổi bên nếu là khán giả
+      document.querySelectorAll(".spectator-hide").forEach(el => {
+          el.style.display = State.isSpectator ? "none" : "block";
+      });
   } else {
       if (inGameUI) inGameUI.style.display = "none";
-      const chatPanel = document.getElementById("chatPanel");
-      if(chatPanel) chatPanel.style.display = "none";
+      if (scoreBoard) scoreBoard.style.display = "none";
+      const chatPanel = document.getElementById("chatPanel"); if(chatPanel) chatPanel.style.display = "none";
   }
 
-  if (State.isAiThinking) {
-    turnIndicator.textContent = "💻 Máy đang tính..."; turnIndicator.style.color = "#94a3b8"; turnIndicator.style.borderColor = "#94a3b8"; return;
-  }
+  if (State.isAiThinking) { turnIndicator.textContent = "💻 Máy đang tính..."; turnIndicator.style.color = "#94a3b8"; turnIndicator.style.borderColor = "#94a3b8"; return; }
 
   if (mode === "online") {
-    if (!State.currentRoomId) {
-      turnIndicator.textContent = "Chưa vào phòng"; turnIndicator.style.color = "#94a3b8"; turnIndicator.style.borderColor = "#cbd5e1"; return;
+    if (!State.currentRoomId) { turnIndicator.textContent = "Chưa vào phòng"; turnIndicator.style.color = "#94a3b8"; turnIndicator.style.borderColor = "#cbd5e1"; return; }
+    
+    if (State.isSpectator) {
+        turnIndicator.textContent = `👀 Khán giả | Lượt: ${State.currentPlayer}`;
+        turnIndicator.style.color = "#64748b"; turnIndicator.style.borderColor = "#cbd5e1";
+        return;
     }
-    if (State.currentPlayer === State.mySide) {
-      turnIndicator.textContent = `Lượt đi: ${State.myName} (${State.currentPlayer})`;
-      turnIndicator.style.color = State.currentPlayer === "X" ? "var(--x-color)" : "var(--o-color)";
-    } else {
-      turnIndicator.textContent = `Đợi ${State.oppName} (${State.currentPlayer})...`;
-      turnIndicator.style.color = "#64748b";
-    }
-    turnIndicator.style.borderColor = State.currentPlayer === "X" ? "var(--x-color)" : "var(--o-color)";
-    return;
-  }
 
+    if (State.currentPlayer === State.mySide) { turnIndicator.textContent = `Lượt đi: ${State.myName} (${State.currentPlayer})`; turnIndicator.style.color = State.currentPlayer === "X" ? "var(--x-color)" : "var(--o-color)"; } 
+    else { turnIndicator.textContent = `Đợi ${State.oppName} (${State.currentPlayer})...`; turnIndicator.style.color = "#64748b"; }
+    turnIndicator.style.borderColor = State.currentPlayer === "X" ? "var(--x-color)" : "var(--o-color)"; return;
+  }
   turnIndicator.textContent = mode === "pvp" ? `Lượt đi: Người chơi ${State.currentPlayer}` : (State.currentPlayer === "X" ? "Lượt đi: Bạn (X)" : "Lượt đi: Máy (O)");
-  turnIndicator.style.color = State.currentPlayer === "X" ? "var(--x-color)" : "var(--o-color)";
-  turnIndicator.style.borderColor = State.currentPlayer === "X" ? "var(--x-color)" : "var(--o-color)";
+  turnIndicator.style.color = State.currentPlayer === "X" ? "var(--x-color)" : "var(--o-color)"; turnIndicator.style.borderColor = State.currentPlayer === "X" ? "var(--x-color)" : "var(--o-color)";
 }
 
-/* =======================
-   INIT / RENDER
-======================= */
 function buildBoardDOM() {
-  if (!boardElement) return;
-  boardElement.innerHTML = "";
-  for (let r = 0; r < BOARD_SIZE; r++) {
-    for (let c = 0; c < BOARD_SIZE; c++) {
-      const cell = document.createElement("div");
-      cell.className = "cell"; cell.dataset.row = r; cell.dataset.col = c;
-      cell.addEventListener("click", handleCellClick);
-      boardElement.appendChild(cell);
-    }
+  if (!boardElement) return; boardElement.innerHTML = "";
+  for (let r = 0; r < BOARD_SIZE; r++) for (let c = 0; c < BOARD_SIZE; c++) {
+      const cell = document.createElement("div"); cell.className = "cell"; cell.dataset.row = r; cell.dataset.col = c;
+      cell.addEventListener("click", handleCellClick); boardElement.appendChild(cell);
   }
 }
 
 function resetLocalGame(keepOnline = false) {
-  State.board = emptyBoard(); State.moveHistory = []; State.currentPlayer = "X";
-  State.gameActive = true; State.lastMoveElement = null; State.isAiThinking = false;
-  State.opponentRequestedRematch = false;
-  
-  const rematchBtn = document.getElementById("btnInGameRematch");
-  if (rematchBtn) { rematchBtn.innerHTML = "🔄 Chơi Lại"; rematchBtn.classList.remove("pulse-btn"); }
-
-  if (modalOverlay) modalOverlay.classList.remove("active");
-  document.querySelectorAll(".win-cell").forEach(e => e.classList.remove("win-cell"));
+  State.board = emptyBoard(); State.moveHistory = []; State.currentPlayer = "X"; State.gameActive = true; State.lastMoveElement = null; State.isAiThinking = false; State.opponentRequestedRematch = false; State.swapRequested = false; State.processedWinner = false;
+  const rematchBtn = document.getElementById("btnInGameRematch"); if (rematchBtn) { rematchBtn.innerHTML = "🔄 Chơi Lại"; rematchBtn.classList.remove("pulse-btn"); }
+  const swapBtn = document.getElementById("btnInGameSwap"); if (swapBtn) { swapBtn.innerHTML = "🎲 Đổi Bên"; swapBtn.classList.remove("pulse-btn"); }
+  if (modalOverlay) modalOverlay.classList.remove("active"); document.querySelectorAll(".win-cell").forEach(e => e.classList.remove("win-cell"));
 
   if (!keepOnline) {
     if (State.unsubscribeRoom) { State.unsubscribeRoom(); State.unsubscribeRoom = null; }
-    State.currentRoomId = null; State.mySide = null; State.currentResetSignal = 0;
-    State.myName = "Bạn"; State.oppName = "Đối thủ";
-    stopHeartbeat();
-    if (roomStatus) roomStatus.innerHTML = "";
+    State.currentRoomId = null; State.mySide = null; State.currentResetSignal = 0; State.myName = "Bạn"; State.oppName = "Đối thủ"; State.isSpectator = false; State.scoreX = 0; State.scoreO = 0;
+    stopHeartbeat(); if (roomStatus) roomStatus.innerHTML = "";
   }
-  
   buildBoardDOM(); updateUIState();
 }
-
 window.initGame = function (keepOnline = false) { resetLocalGame(keepOnline); };
 
 /* =======================
@@ -379,113 +315,63 @@ function checkWin(row, col, player) {
   const directions = [[[0, 1], [0, -1]], [[1, 0], [-1, 0]], [[1, 1], [-1, -1]], [[1, -1], [-1, 1]]];
   for (const dir of directions) {
     const winCells = [{ row, col }];
-    for (const [dr, dc] of dir) {
-      let r = row + dr, c = col + dc;
-      while (inBounds(r, c) && State.board[r][c] === player) { winCells.push({ row: r, col: c }); r += dr; c += dc; }
-    }
+    for (const [dr, dc] of dir) { let r = row + dr, c = col + dc; while (inBounds(r, c) && State.board[r][c] === player) { winCells.push({ row: r, col: c }); r += dr; c += dc; } }
     if (winCells.length >= 5) return winCells;
   }
   return null;
 }
-
-function highlightWinCells(cells) {
-  cells.forEach(p => { const el = getCellElement(p.row, p.col); if(el) el.classList.add("win-cell"); });
-}
+function highlightWinCells(cells) { cells.forEach(p => { const el = getCellElement(p.row, p.col); if(el) el.classList.add("win-cell"); }); }
 
 function applyMoveLocally(r, c, player, isOnlineSync = false) {
   if (!State.gameActive || !inBounds(r, c) || State.board[r][c] !== "") return { ok: false };
-
-  State.board[r][c] = player;
-  const cell = getCellElement(r, c);
-  
-  if (cell) {
-    cell.textContent = player; cell.classList.add(player.toLowerCase());
-    if (State.lastMoveElement) State.lastMoveElement.classList.remove("last-move");
-    cell.classList.add("last-move"); State.lastMoveElement = cell;
-  }
+  State.board[r][c] = player; const cell = getCellElement(r, c);
+  if (cell) { cell.textContent = player; cell.classList.add(player.toLowerCase()); if (State.lastMoveElement) State.lastMoveElement.classList.remove("last-move"); cell.classList.add("last-move"); State.lastMoveElement = cell; }
   State.moveHistory.push({ row: r, col: c, player, element: cell });
-  AudioSys.play('click'); // Phát âm thanh đánh cờ
+  AudioSys.play('click'); 
 
   const winCells = checkWin(r, c, player);
   if (winCells) {
     highlightWinCells(winCells); State.gameActive = false;
-    
     if (!isOnlineSync) {
-        let msg = modeSelect.value === "online" ? "🎉 Bạn đã chiến thắng!" : `🎉 Người chơi ${player} thắng!`;
-        if (modeSelect.value !== "online" && player === "O") msg = "🤖 Máy đã thắng!";
-        showModal(msg);
-        AudioSys.play('win'); // Phát nhạc thắng
+        if(State.isSpectator) {
+            showModal(`🎉 Người chơi ${player} thắng!`); AudioSys.play('win');
+        } else {
+            let msg = modeSelect.value === "online" ? "🎉 Bạn đã chiến thắng!" : `🎉 Người chơi ${player} thắng!`;
+            if (modeSelect.value !== "online" && player === "O") msg = "🤖 Máy đã thắng!";
+            showModal(msg); AudioSys.play('win');
+        }
     }
     return { ok: true, winCells: winCells };
   }
-
-  if (State.moveHistory.length === BOARD_SIZE * BOARD_SIZE) {
-    State.gameActive = false; showModal("🤝 Hòa cờ!");
-    return { ok: true, draw: true };
-  }
-
-  State.currentPlayer = (State.currentPlayer === "X") ? "O" : "X";
-  updateUIState();
-  return { ok: true };
+  if (State.moveHistory.length === BOARD_SIZE * BOARD_SIZE) { State.gameActive = false; showModal("🤝 Hòa cờ!"); return { ok: true, draw: true }; }
+  State.currentPlayer = (State.currentPlayer === "X") ? "O" : "X"; updateUIState(); return { ok: true };
 }
 
 /* =======================
-   AI (MASTER PATTERN HEURISTIC)
+   AI LOGIC 
 ======================= */
-const PATTERNS = [
-  { re: /PPPPP/, score: 100000000 }, { re: /\.PPPP\./, score: 10000000 }, 
-  { re: /BPPPP\./, score: 1000000 }, { re: /\.PPPPB/, score: 1000000 }, 
-  { re: /P\.PPP/, score: 1000000 }, { re: /PPP\.P/, score: 1000000 },
-  { re: /PP\.PP/, score: 1000000 }, { re: /\.PPP\./, score: 100000 }, 
-  { re: /\.P\.PP\./, score: 80000 }, { re: /\.PP\.P\./, score: 80000 },
-  { re: /BPPP\.\./, score: 10000 }, { re: /\.\.PPPB/, score: 10000 },
-  { re: /BPP\.P\./, score: 8000 }, { re: /\.P\.PPB/, score: 8000 },
-  { re: /BP\.PP\./, score: 8000 }, { re: /\.PP\.PB/, score: 8000 },
-  { re: /P\.\.PP/, score: 5000 }, { re: /PP\.\.P/, score: 5000 },
-  { re: /P\.P\.P/, score: 5000 }, { re: /\.PP\./, score: 1000 }, 
-  { re: /\.P\.P\./, score: 800 }, { re: /\.\.PP\.\./, score: 600 },
-  { re: /BPP\.\.\./, score: 100 }, { re: /\.\.\.PPB/, score: 100 }
-];
-
-function getAxisString(r, c, dr, dc, player) {
-  let str = "";
-  for (let i = -4; i <= 4; i++) {
-    const nr = r + dr * i, nc = c + dc * i;
-    if (!inBounds(nr, nc)) str += "B"; else if (State.board[nr][nc] === player) str += "P"; else if (State.board[nr][nc] === "") str += "."; else str += "B";
-  }
-  return str;
-}
-
+const PATTERNS = [{ re: /PPPPP/, score: 100000000 }, { re: /\.PPPP\./, score: 10000000 }, { re: /BPPPP\./, score: 1000000 }, { re: /\.PPPPB/, score: 1000000 }, { re: /P\.PPP/, score: 1000000 }, { re: /PPP\.P/, score: 1000000 }, { re: /PP\.PP/, score: 1000000 }, { re: /\.PPP\./, score: 100000 }, { re: /\.P\.PP\./, score: 80000 }, { re: /\.PP\.P\./, score: 80000 }, { re: /BPPP\.\./, score: 10000 }, { re: /\.\.PPPB/, score: 10000 }, { re: /BPP\.P\./, score: 8000 }, { re: /\.P\.PPB/, score: 8000 }, { re: /BP\.PP\./, score: 8000 }, { re: /\.PP\.PB/, score: 8000 }, { re: /P\.\.PP/, score: 5000 }, { re: /PP\.\.P/, score: 5000 }, { re: /P\.P\.P/, score: 5000 }, { re: /\.PP\./, score: 1000 }, { re: /\.P\.P\./, score: 800 }, { re: /\.\.PP\.\./, score: 600 }, { re: /BPP\.\.\./, score: 100 }, { re: /\.\.\.PPB/, score: 100 }];
+function getAxisString(r, c, dr, dc, player) { let str = ""; for (let i = -4; i <= 4; i++) { const nr = r + dr * i, nc = c + dc * i; if (!inBounds(nr, nc)) str += "B"; else if (State.board[nr][nc] === player) str += "P"; else if (State.board[nr][nc] === "") str += "."; else str += "B"; } return str; }
 function evaluateCellMaster(r, c, player) {
-  State.board[r][c] = player; 
-  let score = 0; let open3Count = 0; let closed4Count = 0;
+  State.board[r][c] = player; let score = 0; let open3Count = 0; let closed4Count = 0;
   for (const [dr, dc] of [[0, 1], [1, 0], [1, 1], [1, -1]]) {
-    const str = getAxisString(r, c, dr, dc, player);
-    let lineScore = 0;
+    const str = getAxisString(r, c, dr, dc, player); let lineScore = 0;
     for (let i = 0; i < PATTERNS.length; i++) { if (PATTERNS[i].re.test(str)) { lineScore = PATTERNS[i].score; break; } }
-    score += lineScore;
-    if (lineScore === 100000 || lineScore === 80000) open3Count++;
-    if (lineScore === 1000000) closed4Count++;
+    score += lineScore; if (lineScore === 100000 || lineScore === 80000) open3Count++; if (lineScore === 1000000) closed4Count++;
   }
   State.board[r][c] = ""; 
-  if (closed4Count >= 2) score += 10000000;
-  if (closed4Count >= 1 && open3Count >= 1) score += 5000000;
-  if (open3Count >= 2) score += 2000000;
+  if (closed4Count >= 2) score += 10000000; if (closed4Count >= 1 && open3Count >= 1) score += 5000000; if (open3Count >= 2) score += 2000000;
   return score;
 }
-
 function calculateLocalAIMove(difficulty, aiSide) {
   const oppSide = aiSide === "X" ? "O" : "X"; let candidates = []; let isBoardEmpty = true;
-  for (let r = 0; r < BOARD_SIZE; r++) {
-    for (let c = 0; c < BOARD_SIZE; c++) {
+  for (let r = 0; r < BOARD_SIZE; r++) for (let c = 0; c < BOARD_SIZE; c++) {
       if (State.board[r][c] !== "") { isBoardEmpty = false; continue; }
       let isNearPiece = false;
       for (let i = -2; i <= 2 && !isNearPiece; i++) for (let j = -2; j <= 2; j++) if (inBounds(r+i, c+j) && State.board[r+i][c+j] !== "") isNearPiece = true;
       if (!isNearPiece) continue;
-
       let totalScore = (evaluateCellMaster(r, c, aiSide) * 1.05) + evaluateCellMaster(r, c, oppSide) + (20 - (Math.abs(r - BOARD_SIZE/2) + Math.abs(c - BOARD_SIZE/2)));
-      candidates.push({ r, c, score: totalScore, attackScore: evaluateCellMaster(r, c, aiSide) });
-    }
+      candidates.push({ r, c, score: totalScore });
   }
   if (isBoardEmpty || candidates.length === 0) return { r: Math.floor(BOARD_SIZE / 2), c: Math.floor(BOARD_SIZE / 2) };
   candidates.sort((a, b) => b.score - a.score);
@@ -494,17 +380,12 @@ function calculateLocalAIMove(difficulty, aiSide) {
   return candidates[0];
 }
 
-/* =======================
-   CLICK HANDLER
-======================= */
 function handleCellClick(e) {
-  AudioSys.init(); // Đảm bảo Web Audio được kích hoạt ở lần chạm đầu tiên
-  if (!State.gameActive || State.isAiThinking) return;
+  AudioSys.init(); if (!State.gameActive || State.isAiThinking) return;
+  if (State.isSpectator) return window.showToast("Bạn đang là Khán giả, không thể đánh cờ!");
 
-  const r = parseInt(e.target.dataset.row, 10);
-  const c = parseInt(e.target.dataset.col, 10);
+  const r = parseInt(e.target.dataset.row, 10), c = parseInt(e.target.dataset.col, 10);
   if (State.board[r][c] !== "") return;
-
   const mode = modeSelect ? modeSelect.value : "pvp";
 
   if (mode === "online") {
@@ -513,46 +394,42 @@ function handleCellClick(e) {
     if (result.ok) syncMoveToFirebase(r, c, State.mySide, result.winCells);
     return;
   }
-
   applyMoveLocally(r, c, State.currentPlayer);
-
   if (State.gameActive && mode.startsWith("pve") && State.currentPlayer === "O") {
     State.isAiThinking = true; updateUIState();
     setTimeout(() => {
       let diff = mode.split("-")[1] || "hard"; if(diff === "super") diff = "hard"; 
-      const move = calculateLocalAIMove(diff, "O");
-      applyMoveLocally(move.r, move.c, "O");
+      const move = calculateLocalAIMove(diff, "O"); applyMoveLocally(move.r, move.c, "O");
       State.isAiThinking = false; updateUIState();
     }, 50);
   }
 }
 
 /* =======================
-   ONLINE & FIREBASE
+   FIREBASE ONLINE SYNC
 ======================= */
 function listenToAvailableRooms() {
   if (!db) return;
-  const roomsRef = collection(db, "rooms");
-  const q = query(roomsRef, where("playerO", "==", ""));
+  // Bỏ filter 'playerO' == '' để cho phép Khán giả thấy tất cả các phòng
+  const q = collection(db, "rooms");
   if (State.unsubscribeRooms) State.unsubscribeRooms();
 
   State.unsubscribeRooms = onSnapshot(q, (snapshot) => {
     const roomListEl = document.getElementById("availableRooms");
     if (!roomListEl) return; roomListEl.innerHTML = "";
-    
     let hasActiveRooms = false; const now = Date.now();
 
     snapshot.forEach(d => {
       const data = d.data();
       if (!data.lastActive || (now - data.lastActive > 10 * 60 * 1000)) { deleteDoc(doc(db, "rooms", d.id)).catch(()=>{}); return; }
-
+      
       hasActiveRooms = true;
       const roomName = d.id.replace("room_", "");
-      const hostName = data.playerNameX ? ` (Host: ${data.playerNameX})` : ""; // Hiện tên chủ phòng
-      
-      const btn = document.createElement("button");
-      btn.className = "btn-room";
-      btn.innerHTML = `🏠 <b>${roomName}</b><span style="font-size:0.75rem; color:#64748b;">${hostName}</span>`;
+      const hostName = data.playerNameX ? ` (Host: ${data.playerNameX})` : ""; 
+      const isFull = (data.playerX !== "" && data.playerO !== "") ? " <span style='color:red; font-size:0.7rem'>(Đầy - Khán giả)</span>" : "";
+
+      const btn = document.createElement("button"); btn.className = "btn-room";
+      btn.innerHTML = `🏠 <b>${roomName}</b><span style="font-size:0.75rem; color:#64748b;">${hostName}</span>${isFull}`;
       btn.onclick = () => { document.getElementById("roomIdInput").value = roomName; window.joinOrCreateRoom(); };
       roomListEl.appendChild(btn);
     });
@@ -569,85 +446,133 @@ window.joinOrCreateRoom = async function () {
   const roomIdInput = roomIdInputEl.value.trim().toLowerCase();
   if (!roomIdInput) return alert("Vui lòng nhập tên phòng!");
 
-  // Lấy tên người chơi vừa nhập
   const inputNameVal = document.getElementById("playerNameInput")?.value.trim() || "";
   const myName = inputNameVal !== "" ? inputNameVal : "Người Lạ";
-
-  const roomId = "room_" + roomIdInput;
-  window.initGame(true);
+  const roomId = "room_" + roomIdInput; window.initGame(true); const now = Date.now();
   const roomRef = doc(db, "rooms", roomId);
-  const now = Date.now();
 
   try {
     const snap = await getDoc(roomRef);
     if (!snap.exists()) {
-      await setDoc(roomRef, {
+      // Random phe lúc tạo phòng
+      const hostSide = Math.random() < 0.5 ? "X" : "O";
+      const payload = {
         board1D: Array(BOARD_SIZE * BOARD_SIZE).fill(""), turn: "X", lastMoveIndex: -1,
-        playerX: myLocalUid, playerO: "",
-        playerNameX: myName, playerNameO: "", // Gửi tên lên Firebase
-        resetSignal: now, lastActive: now, winner: null, winCells: null, rematchRequest: null
-      });
-      State.mySide = "X"; State.currentRoomId = roomId;
+        playerX: hostSide === "X" ? myLocalUid : "", playerO: hostSide === "O" ? myLocalUid : "",
+        playerNameX: hostSide === "X" ? myName : "", playerNameO: hostSide === "O" ? myName : "",
+        resetSignal: now, lastActive: now, winner: null, winCells: null, rematchRequest: null, swapRequest: null,
+        scoreX: 0, scoreO: 0
+      };
+      await setDoc(roomRef, payload);
+      State.mySide = hostSide; State.currentRoomId = roomId; State.isSpectator = false;
     } else {
       const data = snap.data();
-      if (!data.lastActive || (now - data.lastActive > 10 * 60 * 1000) || data.winner) {
+      if (!data.lastActive || (now - data.lastActive > 10 * 60 * 1000)) {
+         const hostSide = Math.random() < 0.5 ? "X" : "O";
          await setDoc(roomRef, {
             board1D: Array(BOARD_SIZE * BOARD_SIZE).fill(""), turn: "X", lastMoveIndex: -1,
-            playerX: myLocalUid, playerO: "", playerNameX: myName, playerNameO: "",
-            resetSignal: now, lastActive: now, winner: null, winCells: null, rematchRequest: null
+            playerX: hostSide === "X" ? myLocalUid : "", playerO: hostSide === "O" ? myLocalUid : "", 
+            playerNameX: hostSide === "X" ? myName : "", playerNameO: hostSide === "O" ? myName : "",
+            resetSignal: now, lastActive: now, winner: null, winCells: null, rematchRequest: null, swapRequest: null,
+            scoreX: 0, scoreO: 0
          });
-         State.mySide = "X";
+         State.mySide = hostSide; State.isSpectator = false;
       } else {
         let pX = data.playerX; let pO = data.playerO;
-        if (pX === myLocalUid) { State.mySide = "X"; await updateDoc(roomRef, { playerNameX: myName }); }
-        else if (pO === myLocalUid) { State.mySide = "O"; await updateDoc(roomRef, { playerNameO: myName }); }
-        else if (pX === "") { await updateDoc(roomRef, { playerX: myLocalUid, playerNameX: myName, lastActive: now }); State.mySide = "X"; }
-        else if (pO === "") { await updateDoc(roomRef, { playerO: myLocalUid, playerNameO: myName, lastActive: now }); State.mySide = "O"; } 
-        else return alert("Phòng đã đủ 2 người đang chơi!");
+        if (pX === myLocalUid) { State.mySide = "X"; State.isSpectator = false; await updateDoc(roomRef, { playerNameX: myName }); }
+        else if (pO === myLocalUid) { State.mySide = "O"; State.isSpectator = false; await updateDoc(roomRef, { playerNameO: myName }); }
+        else if (pX === "") { await updateDoc(roomRef, { playerX: myLocalUid, playerNameX: myName, lastActive: now }); State.mySide = "X"; State.isSpectator = false; }
+        else if (pO === "") { await updateDoc(roomRef, { playerO: myLocalUid, playerNameO: myName, lastActive: now }); State.mySide = "O"; State.isSpectator = false; } 
+        else {
+           // Phòng đầy -> Vào làm khán giả
+           State.mySide = "Spectator"; State.isSpectator = true; State.myName = myName;
+           window.sendChat(`👋 ${myName} vừa vào xem trận đấu.`, true);
+           window.showToast("Bạn đã vào phòng với tư cách Khán Giả!");
+        }
       }
       State.currentRoomId = roomId; State.currentResetSignal = data.resetSignal || 0;
     }
     
     startHeartbeat(); listenToRoom(roomRef); updateUIState();
-  } catch (e) { console.error(e); alert("Lỗi truy cập dữ liệu! Hãy mở quyền cho Firebase."); }
+  } catch (e) { console.error(e); alert("Lỗi truy cập dữ liệu Firebase!"); }
 };
 
 function listenToRoom(roomRef) {
   if (State.unsubscribeRoom) State.unsubscribeRoom();
   State.unsubscribeRoom = onSnapshot(roomRef, (snap) => {
     if (!snap.exists()) {
-        if (State.currentRoomId && modeSelect.value === "online") { window.showToast("Phòng đã bị xóa do quá lâu không có ai chơi!"); window.initGame(); }
+        if (State.currentRoomId && modeSelect.value === "online") { window.showToast("Phòng đã bị xóa!"); window.initGame(); }
         return;
     }
     const data = snap.data();
 
-    // Lấy tên để hiển thị
-    State.myName = State.mySide === "X" ? (data.playerNameX || "Bạn") : (data.playerNameO || "Bạn");
-    State.oppName = State.mySide === "X" ? (data.playerNameO || "Đối thủ") : (data.playerNameX || "Đối thủ");
+    State.scoreX = data.scoreX || 0; State.scoreO = data.scoreO || 0;
+    State.uidX = data.playerX; State.uidO = data.playerO;
+
+    if (!State.isSpectator) {
+        State.myName = State.mySide === "X" ? (data.playerNameX || "Bạn") : (data.playerNameO || "Bạn");
+        State.oppName = State.mySide === "X" ? (data.playerNameO || "Đối thủ") : (data.playerNameX || "Đối thủ");
+    } else {
+        State.oppName = "Hai người chơi"; // Khán giả
+    }
+
+    // Cập nhật bảng tỉ số
+    const sTextX = document.getElementById("scoreTextX");
+    const sTextO = document.getElementById("scoreTextO");
+    if(sTextX && sTextO) {
+        sTextX.textContent = `${data.playerNameX || 'Quân X'}: ${State.scoreX}`;
+        sTextO.textContent = `${data.playerNameO || 'Quân O'}: ${State.scoreO}`;
+        // Bôi đậm tên mình
+        sTextX.style.fontWeight = State.mySide === "X" ? "900" : "normal";
+        sTextO.style.fontWeight = State.mySide === "O" ? "900" : "normal";
+    }
 
     let isOpponentHere = (State.mySide === "X" && data.playerO !== "") || (State.mySide === "O" && data.playerX !== "");
     if (data.playerX && data.playerO !== "" && roomStatus) {
-      roomStatus.innerHTML = `Phòng: <b>${State.currentRoomId.replace("room_", "")}</b><br>(Bạn là <b>${State.myName}</b> vs <b>${State.oppName}</b>)`;
+      if(State.isSpectator) roomStatus.innerHTML = `Phòng: <b>${State.currentRoomId.replace("room_", "")}</b><br>(Khán Giả đang xem)`;
+      else roomStatus.innerHTML = `Phòng: <b>${State.currentRoomId.replace("room_", "")}</b><br>(Bạn là <b>${State.myName}</b> vs <b>${State.oppName}</b>)`;
     } else if (roomStatus) {
-      roomStatus.innerHTML = `Phòng: <span style="color:#2563eb; font-size:1.1rem">${State.currentRoomId.replace("room_", "")}</span><br>Bạn là <b>${State.myName}</b>. Đang đợi...`;
-      if (!isOpponentHere && State.gameActive === false && State.currentRoomId) window.showToast(`${State.oppName} đã rời phòng!`);
+      if(State.isSpectator) roomStatus.innerHTML = `Phòng: <b>${State.currentRoomId.replace("room_", "")}</b><br>(Khán Giả: Chờ đủ 2 người)`;
+      else roomStatus.innerHTML = `Phòng: <span style="color:#2563eb; font-size:1.1rem">${State.currentRoomId.replace("room_", "")}</span><br>Bạn là <b>${State.myName}</b>. Đang đợi...`;
+      if (!isOpponentHere && State.gameActive === false && State.currentRoomId && !State.isSpectator) window.showToast(`${State.oppName} đã rời phòng!`);
     }
 
+    // Xử lý Rematch Request
     const btnRematch = document.getElementById("btnInGameRematch");
-    if (data.rematchRequest) {
+    if (data.rematchRequest && !State.isSpectator) {
         if (data.rematchRequest !== State.mySide) {
             State.opponentRequestedRematch = true;
             if(btnRematch) { btnRematch.innerHTML = "⚠️ Đối thủ gạ chơi lại (Bấm Đồng ý)"; btnRematch.classList.add("pulse-btn"); }
-        } else {
-            if(btnRematch) btnRematch.innerHTML = "⏳ Đang đợi đối thủ xác nhận...";
-        }
+        } else { if(btnRematch) btnRematch.innerHTML = "⏳ Đang đợi đối thủ xác nhận..."; }
     } else {
         State.opponentRequestedRematch = false;
         if(btnRematch) { btnRematch.innerHTML = "🔄 Chơi Lại"; btnRematch.classList.remove("pulse-btn"); }
     }
 
+    // Xử lý Swap Request (Đổi bên)
+    const btnSwap = document.getElementById("btnInGameSwap");
+    if (data.swapRequest && !State.isSpectator) {
+        if (data.swapRequest !== State.mySide) {
+            State.swapRequested = true;
+            if(btnSwap) { btnSwap.innerHTML = "⚠️ Đối thủ xin Đổi X/O (Bấm Đồng ý)"; btnSwap.classList.add("pulse-btn"); }
+        } else { if(btnSwap) btnSwap.innerHTML = "⏳ Chờ xác nhận đổi..."; }
+    } else {
+        State.swapRequested = false;
+        if(btnSwap) { btnSwap.innerHTML = "🎲 Đổi Bên"; btnSwap.classList.remove("pulse-btn"); }
+    }
+
+    // Bắt tín hiệu reset (ván mới) HOẶC đổi phe
     if (data.resetSignal && data.resetSignal !== State.currentResetSignal) {
-      State.currentResetSignal = data.resetSignal; resetLocalGame(true); State.currentPlayer = data.turn || "X"; updateUIState(); window.showToast("Ván mới đã bắt đầu!"); return; 
+      State.currentResetSignal = data.resetSignal; 
+      
+      // Nếu uid của mình bị đổi từ X sang O hoặc ngược lại -> Cập nhật phe
+      if(!State.isSpectator) {
+          if(data.playerX === myLocalUid) State.mySide = "X";
+          else if(data.playerO === myLocalUid) State.mySide = "O";
+      }
+
+      resetLocalGame(true); State.currentPlayer = data.turn || "X"; updateUIState(); 
+      window.showToast("Bàn cờ đã được làm mới!"); return; 
     }
 
     if (Array.isArray(data.board1D) && data.board1D.length === BOARD_SIZE * BOARD_SIZE) {
@@ -666,22 +591,37 @@ function listenToRoom(roomRef) {
       if (cell) {
          if (State.lastMoveElement) State.lastMoveElement.classList.remove("last-move");
          cell.classList.add("last-move"); State.lastMoveElement = cell;
-         // Nếu không phải lượt của mình vừa đi, phát âm thanh đánh của đối thủ
-         if (State.currentPlayer === State.mySide) AudioSys.play('click');
+         if (State.currentPlayer === State.mySide && data.turn === State.mySide) AudioSys.play('click');
       }
     }
 
     if (data.winner && State.gameActive) {
        State.gameActive = false;
        if (data.winCells) highlightWinCells(data.winCells);
-       if (data.winner === State.mySide) { showModal("🎉 Bạn đã chiến thắng!"); AudioSys.play('win'); }
-       else { showModal(`🥲 ${State.oppName} đã chiến thắng!`); AudioSys.play('lose'); }
+       
+       if (State.isSpectator) {
+           showModal(`🎉 ${data.winner === "X" ? data.playerNameX : data.playerNameO} (${data.winner}) đã chiến thắng!`);
+       } else {
+           if (data.winner === State.mySide) { showModal("🎉 Bạn đã chiến thắng!"); AudioSys.play('win'); }
+           else { showModal(`🥲 ${State.oppName} đã chiến thắng!`); AudioSys.play('lose'); }
+       }
+       
+       // Xử lý cộng điểm (Chỉ cộng 1 lần khi mới nhận winner)
+       if (!State.processedWinner) {
+           State.processedWinner = true;
+           if (!State.isSpectator && data.winner === State.mySide) {
+               // Mình thắng thì mình cộng điểm cho phe của mình
+               const updateData = {};
+               if (State.mySide === "X") updateData.scoreX = State.scoreX + 1;
+               else updateData.scoreO = State.scoreO + 1;
+               updateDoc(roomRef, updateData).catch(()=>{});
+           }
+       }
     }
 
     if (data.chatMessage && data.chatMessage.id !== State.lastChatId) {
         State.lastChatId = data.chatMessage.id; displayIncomingChat(data.chatMessage);
     }
-
     State.currentPlayer = data.turn || "X"; updateUIState();
   }, (err) => console.error(err));
 }
@@ -698,16 +638,39 @@ function syncMoveToFirebase(row, col, playerJustMoved, winCellsData) {
 }
 
 /* =======================
-   REMATCH (Xác nhận 2 chiều + Hủy sau 5s)
+   REMATCH & SWAP
 ======================= */
 window.requestRematch = async function () {
   AudioSys.play('click');
   const mode = modeSelect ? modeSelect.value : "pvp";
-  if (mode === "online" && State.currentRoomId) {
+  if (mode === "online" && State.currentRoomId && db && !State.isSpectator) {
     const roomRef = doc(db, "rooms", State.currentRoomId);
+    
     if (State.opponentRequestedRematch) {
        if (modalOverlay) modalOverlay.classList.remove("active");
-       await updateDoc(roomRef, { board1D: Array(BOARD_SIZE * BOARD_SIZE).fill(""), turn: "X", lastMoveIndex: -1, winner: null, winCells: null, rematchRequest: null, resetSignal: Date.now(), lastActive: Date.now() }).catch(e => console.error(e));
+       
+       // Khi đồng ý chơi lại -> RANDOM RANDOM AI LÀ X AI LÀ O LẠI TỪ ĐẦU
+       const snap = await getDoc(roomRef);
+       if (snap.exists()) {
+           const d = snap.data();
+           // Tỉ lệ 50% đổi phe
+           const shouldSwap = Math.random() < 0.5;
+           const newPX = shouldSwap ? d.playerO : d.playerX;
+           const newPO = shouldSwap ? d.playerX : d.playerO;
+           const newNameX = shouldSwap ? d.playerNameO : d.playerNameX;
+           const newNameO = shouldSwap ? d.playerNameX : d.playerNameO;
+           // Tỉ số cũng đảo theo
+           const newScoreX = shouldSwap ? d.scoreO : d.scoreX;
+           const newScoreO = shouldSwap ? d.scoreX : d.scoreO;
+
+           await updateDoc(roomRef, { 
+               board1D: Array(BOARD_SIZE * BOARD_SIZE).fill(""), turn: "X", lastMoveIndex: -1, 
+               playerX: newPX, playerO: newPO, playerNameX: newNameX, playerNameO: newNameO,
+               scoreX: newScoreX, scoreO: newScoreO,
+               winner: null, winCells: null, rematchRequest: null, resetSignal: Date.now(), lastActive: Date.now() 
+           }).catch(e => console.error(e));
+           if(shouldSwap) window.showToast("Ván mới: Hệ thống đã đổi bên X/O!");
+       }
     } else {
        await updateDoc(roomRef, { rematchRequest: State.mySide, lastActive: Date.now() }).catch(e=>console.error(e));
        window.showToast("Đã gửi lời mời, chờ (5 giây)...");
@@ -722,12 +685,42 @@ window.requestRematch = async function () {
 };
 window.triggerRematch = window.requestRematch; 
 
+window.requestSwap = async function () {
+    AudioSys.play('click');
+    if (modeSelect?.value !== "online" || !State.currentRoomId || !db || State.isSpectator) return;
+    const roomRef = doc(db, "rooms", State.currentRoomId);
+
+    if (State.swapRequested) {
+        // Đồng ý đổi
+        const snap = await getDoc(roomRef);
+        if (snap.exists()) {
+            const d = snap.data();
+            await updateDoc(roomRef, { 
+               board1D: Array(BOARD_SIZE * BOARD_SIZE).fill(""), turn: "X", lastMoveIndex: -1, 
+               playerX: d.playerO, playerO: d.playerX, playerNameX: d.playerNameO, playerNameO: d.playerNameX,
+               scoreX: d.scoreO, scoreO: d.scoreX,
+               winner: null, winCells: null, swapRequest: null, resetSignal: Date.now(), lastActive: Date.now() 
+           });
+           window.showToast("Đổi bên thành công!");
+        }
+    } else {
+       // Gửi yêu cầu đổi
+       await updateDoc(roomRef, { swapRequest: State.mySide, lastActive: Date.now() }).catch(e=>console.error(e));
+       window.showToast("Xin đổi phe, chờ (5 giây)...");
+       setTimeout(async () => {
+           if (State.currentRoomId) {
+               const snap = await getDoc(roomRef);
+               if (snap.exists() && snap.data().swapRequest === State.mySide) { updateDoc(roomRef, { swapRequest: null }).catch(()=>{}); window.showToast("Xin đổi phe hết hạn!"); }
+           }
+       }, 5000);
+    }
+}
+
 /* =======================
    CHAT LOGIC
 ======================= */
 window.toggleChat = function() {
-    AudioSys.play('click');
-    const panel = document.getElementById("chatPanel"); const notif = document.getElementById("chatNotif");
+    AudioSys.play('click'); const panel = document.getElementById("chatPanel"); const notif = document.getElementById("chatNotif");
     if (!panel) return;
     if (panel.style.display === "none" || panel.style.display === "") {
         panel.style.display = "flex"; if(notif) notif.style.display = "none";
@@ -735,10 +728,13 @@ window.toggleChat = function() {
     } else panel.style.display = "none";
 };
 
-window.sendChat = function(text) {
+window.sendChat = function(text, isSystemMsg = false) {
     AudioSys.play('click');
-    if (!State.currentRoomId || !db) return window.showToast("Chưa vào phòng Online!");
-    updateDoc(doc(db, "rooms", State.currentRoomId), { chatMessage: { text: text, sender: State.mySide, id: Date.now() }, lastActive: Date.now() }).catch(e => console.log(e));
+    if (!State.currentRoomId || !db) return;
+    let sName = State.isSpectator ? `👁️ Khán giả (${State.myName})` : State.myName;
+    if (isSystemMsg) sName = "Hệ thống";
+    
+    updateDoc(doc(db, "rooms", State.currentRoomId), { chatMessage: { text: text, sender: State.mySide, sName: sName, sys: isSystemMsg, id: Date.now() }, lastActive: Date.now() }).catch(e => console.log(e));
 };
 
 window.sendTextChat = function() {
@@ -750,17 +746,23 @@ function displayIncomingChat(msgData) {
     const box = document.getElementById("chatMessages"); const panel = document.getElementById("chatPanel"); const notif = document.getElementById("chatNotif");
     if (!box) return;
 
-    const isMe = msgData.sender === State.mySide;
+    const isMe = msgData.sender === State.mySide && !msgData.sys;
     const div = document.createElement("div");
-    div.className = "chat-msg " + (isMe ? "chat-mine" : "chat-theirs");
-    div.innerHTML = `<b>${isMe ? State.myName : State.oppName}:</b> ${msgData.text}`; // Hiện tên người gửi
+    
+    if (msgData.sys) {
+        div.className = "chat-msg chat-sys"; div.innerHTML = msgData.text;
+    } else {
+        div.className = "chat-msg " + (isMe ? "chat-mine" : "chat-theirs");
+        div.innerHTML = `<b>${msgData.sName}:</b> ${msgData.text}`;
+    }
+    
     box.appendChild(div); box.scrollTop = box.scrollHeight;
 
     if (!isMe) {
-        AudioSys.play('ting'); // Phát tiếng ting khi có chat đến
+        AudioSys.play('ting'); 
         if (panel.style.display === "none" || panel.style.display === "") {
             if(notif) notif.style.display = "block";
-            window.showToast(`💬 ${State.oppName}: ${msgData.text}`);
+            window.showToast(`💬 ${msgData.sName}: ${msgData.text}`);
         }
     }
 }
@@ -803,7 +805,7 @@ window.handleFooterClick = function () {
 window.handleCheatClick = window.handleFooterClick;
 
 window.triggerCheat = function () {
-  if (!State.gameActive || State.isAiThinking) return;
+  if (!State.gameActive || State.isAiThinking || State.isSpectator) return;
   const mode = modeSelect ? modeSelect.value : "pvp";
   if (mode === "online") {
     if (!State.currentRoomId || State.currentPlayer !== State.mySide) return;
@@ -815,10 +817,7 @@ window.triggerCheat = function () {
     }, 50);
   } else {
     State.isAiThinking = true; updateUIState();
-    setTimeout(() => {
-      const move = calculateLocalAIMove("hard", State.currentPlayer); applyMoveLocally(move.r, move.c, State.currentPlayer);
-      State.isAiThinking = false; updateUIState();
-    }, 50);
+    setTimeout(() => { const move = calculateLocalAIMove("hard", State.currentPlayer); applyMoveLocally(move.r, move.c, State.currentPlayer); State.isAiThinking = false; updateUIState(); }, 50);
   }
 };
 
@@ -836,9 +835,5 @@ document.addEventListener("DOMContentLoaded", () => {
    injectDynamicUI(); 
    buildBoardDOM();
    window.initGame();
-   
-   if (turnIndicator) {
-      turnIndicator.addEventListener("click", window.handleCheatClick);
-      turnIndicator.style.cursor = "pointer"; 
-   }
+   if (turnIndicator) { turnIndicator.addEventListener("click", window.handleCheatClick); turnIndicator.style.cursor = "pointer"; }
 });
