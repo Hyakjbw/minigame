@@ -67,7 +67,8 @@ const State = {
   
   // Trạng thái online
   opponentRequestedRematch: false,
-  lastChatId: 0
+  lastChatId: 0,
+  heartbeatInterval: null // Nhịp tim giữ phòng
 };
 
 /* =======================
@@ -109,7 +110,7 @@ function injectOnlineUI() {
   `;
   document.querySelector("header").appendChild(inGameUI);
 
-  // Sinh HTML cho kho Emote tự động
+  // Sinh HTML cho kho Emote
   const emotes = ['🤣','😡','😢','🏳️','👏','👍','👎','🤔','😎','😭','🤬','🤯','💩','👻','🤡','❤️','🔥','😴'];
   const emotesHTML = emotes.map(e => `<span class="emote-btn" onclick="window.sendChat('${e}')">${e}</span>`).join('');
 
@@ -139,7 +140,6 @@ function injectOnlineUI() {
   toast.className = "toast-msg";
   document.body.appendChild(toast);
   
-  // Enter để gửi chat
   document.getElementById("chatInput").addEventListener("keypress", function(e) {
       if (e.key === "Enter") window.sendTextChat();
   });
@@ -154,8 +154,25 @@ window.showToast = function(msg) {
 }
 
 /* =======================
-   THOÁT PHÒNG & XÓA PHÒNG
+   NHỊP TIM & THOÁT PHÒNG
 ======================= */
+function startHeartbeat() {
+    if(State.heartbeatInterval) clearInterval(State.heartbeatInterval);
+    // Cứ 5 phút cập nhật lastActive 1 lần để web biết mình vẫn đang nhìn màn hình
+    State.heartbeatInterval = setInterval(() => {
+        if (State.currentRoomId && modeSelect.value === "online" && db) {
+            updateDoc(doc(db, "rooms", State.currentRoomId), { lastActive: Date.now() }).catch(()=>{});
+        }
+    }, 5 * 60 * 1000); 
+}
+
+function stopHeartbeat() {
+    if(State.heartbeatInterval) {
+        clearInterval(State.heartbeatInterval);
+        State.heartbeatInterval = null;
+    }
+}
+
 window.leaveRoom = async function() {
     if (State.currentRoomId && State.mySide && db) {
         const roomRef = doc(db, "rooms", State.currentRoomId);
@@ -166,53 +183,22 @@ window.leaveRoom = async function() {
                 let pX = data.playerX;
                 let pO = data.playerO;
                 
-                // Gỡ tên mình ra khỏi ghế
                 if (State.mySide === "X") pX = "";
                 if (State.mySide === "O") pO = "";
 
                 if (pX === "" && pO === "") {
-                    // Nếu cả 2 ghế đều trống -> Hủy diệt phòng này khỏi Firebase luôn!
-                    await deleteDoc(roomRef);
+                    await deleteDoc(roomRef); // Cả 2 đều rời -> Phá phòng
                 } else {
-                    // Nếu người kia vẫn còn ở lại -> Báo cho họ biết mình đã out
-                    await updateDoc(roomRef, {
-                        playerX: pX,
-                        playerO: pO,
-                        lastActive: Date.now()
-                    });
+                    await updateDoc(roomRef, { playerX: pX, playerO: pO, lastActive: Date.now() });
                 }
             }
-        } catch (e) {
-            console.error("Lỗi khi thoát phòng", e);
-        }
+        } catch (e) { console.error("Lỗi khi thoát", e); }
     }
+    stopHeartbeat();
     window.showToast("Đã rời phòng!");
     if (modeSelect) modeSelect.value = "pvp";
     window.handleModeChange();
 };
-
-// Cứu cánh cuối cùng: Bắt sự kiện khi người dùng nhấn X tắt tab hoặc F5
-window.addEventListener("beforeunload", (e) => {
-    if (modeSelect && modeSelect.value === "online" && State.currentRoomId && State.mySide && db) {
-        // Trình duyệt đang tắt, gọi lệnh hỏa tốc (không await được)
-        const roomRef = doc(db, "rooms", State.currentRoomId);
-        getDoc(roomRef).then(snap => {
-            if (snap.exists()) {
-                const data = snap.data();
-                let pX = data.playerX;
-                let pO = data.playerO;
-                if (State.mySide === "X") pX = "";
-                if (State.mySide === "O") pO = "";
-
-                if (pX === "" && pO === "") {
-                    deleteDoc(roomRef); // Cả 2 đều out
-                } else {
-                    updateDoc(roomRef, { playerX: pX, playerO: pO }); // Người kia còn
-                }
-            }
-        }).catch(()=>{});
-    }
-});
 
 /* =======================
    UTILS
@@ -318,6 +304,7 @@ function resetLocalGame(keepOnline = false) {
     State.currentRoomId = null;
     State.mySide = null;
     State.currentResetSignal = 0;
+    stopHeartbeat();
     if (roomStatus) roomStatus.innerHTML = "";
   }
   
@@ -534,11 +521,20 @@ function listenToAvailableRooms() {
     const roomListEl = document.getElementById("availableRooms");
     if (!roomListEl) return;
     roomListEl.innerHTML = "";
-    if (snapshot.empty) {
-      roomListEl.innerHTML = '<div style="color:#94a3b8; font-size:0.85rem;">Chưa có phòng nào. Hãy tạo phòng mới!</div>';
-      return;
-    }
+    
+    let hasActiveRooms = false;
+    const now = Date.now();
+
     snapshot.forEach(d => {
+      const data = d.data();
+      
+      // NGƯỜI LAO CÔNG: Quét thấy phòng quá 10 phút -> Chủ động xóa giùm luôn
+      if (!data.lastActive || (now - data.lastActive > 10 * 60 * 1000)) {
+          deleteDoc(doc(db, "rooms", d.id)).catch(()=>{});
+          return; // Bỏ qua không hiển thị phòng này lên web
+      }
+
+      hasActiveRooms = true;
       const roomName = d.id.replace("room_", "");
       const btn = document.createElement("button");
       btn.className = "btn-room";
@@ -546,6 +542,10 @@ function listenToAvailableRooms() {
       btn.onclick = () => { document.getElementById("roomIdInput").value = roomName; window.joinOrCreateRoom(); };
       roomListEl.appendChild(btn);
     });
+
+    if (!hasActiveRooms) {
+        roomListEl.innerHTML = '<div style="color:#94a3b8; font-size:0.85rem;">Chưa có phòng nào. Hãy tạo phòng mới!</div>';
+    }
   });
 }
 
@@ -576,20 +576,20 @@ window.joinOrCreateRoom = async function () {
       if (roomStatus) roomStatus.innerHTML = `Đã tạo: <span style="color:#2563eb; font-size:1.1rem">${roomIdInput}</span><br>Bạn là Quân X. Đang đợi...`;
     } else {
       const data = snap.data();
-      let pX = data.playerX;
-      let pO = data.playerO;
-
-      // Xóa người chơi nếu phòng bỏ hoang > 30 phút
-      if (!data.lastActive || (now - data.lastActive > 30 * 60 * 1000)) { pX = ""; pO = ""; }
-
-      if (pX === "" && pO === "") {
-         await updateDoc(roomRef, {
+      
+      // ÉP GHI ĐÈ: Nếu phòng quá 10 phút, HOẶC ván cờ cũ đã đánh xong có Winner -> Ép xóa trắng tạo ván mới
+      if (!data.lastActive || (now - data.lastActive > 10 * 60 * 1000) || data.winner) {
+         await setDoc(roomRef, {
             board1D: Array(BOARD_SIZE * BOARD_SIZE).fill(""), turn: "X", lastMoveIndex: -1,
             playerX: myLocalUid, playerO: "", resetSignal: now, lastActive: now,
             winner: null, winCells: null, rematchRequest: null
          });
          State.mySide = "X";
       } else {
+        // Nếu phòng vẫn đang chơi dang dở
+        let pX = data.playerX;
+        let pO = data.playerO;
+
         if (pX === myLocalUid) State.mySide = "X";
         else if (pO === myLocalUid) State.mySide = "O";
         else if (pX === "") { await updateDoc(roomRef, { playerX: myLocalUid, lastActive: now }); State.mySide = "X"; }
@@ -601,6 +601,8 @@ window.joinOrCreateRoom = async function () {
       State.currentResetSignal = data.resetSignal || 0;
       if (roomStatus) roomStatus.innerHTML = `Vào phòng: <span style="color:#2563eb; font-size:1.1rem">${roomIdInput}</span><br>Bạn là Quân ${State.mySide}`;
     }
+    
+    startHeartbeat(); // Kích hoạt nhịp tim giữ phòng
     listenToRoom(roomRef);
     updateUIState();
   } catch (e) {
@@ -613,16 +615,15 @@ function listenToRoom(roomRef) {
   if (State.unsubscribeRoom) State.unsubscribeRoom();
   State.unsubscribeRoom = onSnapshot(roomRef, (snap) => {
     if (!snap.exists()) {
-        // Nếu phòng bị xóa (do cả 2 người leaveRoom)
         if (State.currentRoomId && modeSelect.value === "online") {
-            window.showToast("Phòng đã bị xóa do không còn ai!");
-            window.initGame();
+            window.showToast("Phòng đã bị xóa do quá lâu không có ai chơi!");
+            window.initGame(); // Kick ra ngoài
         }
         return;
     }
     const data = snap.data();
 
-    // Check xem đối thủ có out không
+    // Check xem đối thủ còn ở trong phòng không
     let isOpponentHere = (State.mySide === "X" && data.playerO !== "") || (State.mySide === "O" && data.playerX !== "");
     if (data.playerX && data.playerO !== "" && roomStatus) {
       roomStatus.innerHTML = `Đang thi đấu: <b>${State.currentRoomId.replace("room_", "")}</b><br>(Bạn là quân ${State.mySide})`;
@@ -633,7 +634,6 @@ function listenToRoom(roomRef) {
       }
     }
 
-    // Xử lý Gạ Chơi Lại (Có Timeout)
     const btnRematch = document.getElementById("btnInGameRematch");
     if (data.rematchRequest) {
         if (data.rematchRequest !== State.mySide) {
@@ -736,7 +736,6 @@ window.requestRematch = async function () {
   if (mode === "online" && State.currentRoomId) {
     const roomRef = doc(db, "rooms", State.currentRoomId);
     
-    // Nếu đối thủ đã gạ rồi, mình ấn tức là ĐỒNG Ý
     if (State.opponentRequestedRematch) {
        if (modalOverlay) modalOverlay.classList.remove("active");
        await updateDoc(roomRef, { 
@@ -746,16 +745,13 @@ window.requestRematch = async function () {
            resetSignal: Date.now(), lastActive: Date.now() 
        }).catch(e => console.error(e));
     } 
-    // Nếu chưa ai gạ, mình là người gạ
     else {
        await updateDoc(roomRef, { rematchRequest: State.mySide, lastActive: Date.now() }).catch(e=>console.error(e));
        window.showToast("Đã gửi lời mời, chờ (5 giây)...");
 
-       // Tính năng HỦY SAU 5 GIÂY NẾU KHÔNG TRẢ LỜI
        setTimeout(async () => {
            if (State.currentRoomId) {
                const snap = await getDoc(roomRef);
-               // Nếu sau 5s mà request trên Firebase vẫn là của mình (tức là đối phương chưa bấm Đồng ý)
                if (snap.exists() && snap.data().rematchRequest === State.mySide) {
                    updateDoc(roomRef, { rematchRequest: null }).catch(()=>{});
                    window.showToast("Lời mời chơi lại đã hết hạn!");
@@ -864,7 +860,10 @@ let cheatClicks = 0; let cheatTimeout = null;
 window.handleFooterClick = function () {
   clearTimeout(cheatTimeout); cheatClicks++;
   const cheatBtn = document.getElementById("cheatBtn");
+  
+  // Đã sửa lại thành ấn 3 lần là hiện cheat
   if (cheatClicks >= 3) { if (cheatBtn) cheatBtn.style.display = "block"; cheatClicks = 0; return; }
+  
   cheatTimeout = setTimeout(() => {
     if (cheatClicks === 2) { if (cheatBtn) cheatBtn.style.display = "none"; }
     cheatClicks = 0;
