@@ -168,7 +168,6 @@ function injectDynamicUI() {
       <div class="menu-item" onclick="window.toggleDarkMode()">
           <span>Giao diện</span> <span id="dmText">${dmIcon}</span>
       </div>
-      <div class="menu-item" onclick="window.showRules()">📜 Luật chơi Caro</div>
       <div class="menu-item" onclick="window.openAdminLogin()">🛡️ Quản trị Admin</div>
       
       <div id="adminPanel">
@@ -248,16 +247,6 @@ window.toggleDarkMode = function() {
     const isDark = document.body.classList.toggle("dark-mode");
     localStorage.setItem("caro_dark", isDark ? "1" : "0");
     document.getElementById("dmText").innerHTML = isDark ? "☀️ Sáng" : "🌙 Tối";
-};
-
-window.showRules = function() {
-    window.toggleSideMenu();
-    let rules = `<b>📜 LUẬT CHƠI CỜ CARO:</b><br><br>
-    - Hai bên luân phiên đặt quân X và O.<br>
-    - Bên nào tạo được 1 đường <b>5 quân liên tiếp</b> (Ngang, Dọc, Chéo) sẽ thắng.<br>
-    - Bị chặn 2 đầu (VD: OXXXXXO) thì <b>không được tính là thắng</b>.<br>
-    - Đổi phe, gạ chơi lại chỉ áp dụng khi bàn cờ trống hoặc ván đấu đã kết thúc.`;
-    showModal(rules);
 };
 
 window.openAdminLogin = async function() {
@@ -382,7 +371,8 @@ function updateUIState() {
 
   if (mode === "online" && State.currentRoomId) {
       if (inGameUI) inGameUI.style.display = "flex";
-      if (scoreBoard) scoreBoard.style.display = "flex"; // Khán giả vẫn thấy tỉ số
+      if (scoreBoard && !State.isSpectator) scoreBoard.style.display = "flex";
+      else if(scoreBoard) scoreBoard.style.display = "none";
       
       document.querySelectorAll(".spectator-hide").forEach(el => {
           if (el.id === "btnInGameSwap") {
@@ -864,7 +854,7 @@ window.toggleChat = function() {
 window.sendChat = function(text, isSystemMsg = false) {
     AudioSys.play('click');
     if (!State.currentRoomId || !db) return;
-    let sName = State.isSpectator ? `👁️ (${State.myName})` : State.myName;
+    let sName = State.isSpectator ? `👁️ Khán giả (${State.myName})` : State.myName;
     if (isSystemMsg) sName = "Hệ thống";
     
     updateDoc(doc(db, "rooms", State.currentRoomId), { chatMessage: { text: text, sender: State.mySide, sName: sName, sys: isSystemMsg, id: Date.now() }, lastActive: Date.now() }).catch(e => console.log(e));
@@ -927,7 +917,7 @@ window.undoMove = function () {
 };
 
 /* =======================
-   CHEAT
+   CHEAT (ẤN 4 LẦN HIỆN, 2 LẦN ẨN)
 ======================= */
 let cheatClicks = 0; let cheatTimeout = null;
 window.handleFooterClick = function () {
