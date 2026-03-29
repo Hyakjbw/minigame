@@ -67,7 +67,7 @@ const State = {
   currentRoomId: null, mySide: null, unsubscribeRoom: null, unsubscribeRooms: null, currentResetSignal: 0,
   opponentRequestedRematch: false, swapRequested: false, lastChatId: 0, heartbeatInterval: null,
   myName: "Bạn", oppName: "Đối thủ", isSpectator: false,
-  scoreX: 0, scoreO: 0, uidX: "", uidO: "", processedWinner: false
+  scoreX: 0, scoreO: 0, uidX: "", uidO: ""
 };
 
 /* =======================
@@ -185,14 +185,11 @@ function injectDynamicUI() {
   document.body.appendChild(sideMenu);
   
   window.downloadIOSConfig = function() {
-      // Hàm ẩn tạo link ảo, bắt trình duyệt tự động tải xuống.
-      window.showToast("Đang tải cấu hình. Bạn nhớ cấp quyền cài đặt nhé!");
-      const a = document.createElement("a");
-      a.href = iosConfigURL;
-      a.download = "co_caro.mobileconfig"; 
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      // Cách chuẩn để Safari iOS nhận diện và bật popup cài đặt Hồ Sơ
+      window.showToast("Đang tải hồ sơ... Vui lòng bấm 'Cho phép' (Allow) nhé!");
+      setTimeout(() => {
+          window.location.href = iosConfigURL; 
+      }, 1500); // Chờ 1.5s để người dùng kịp đọc thông báo
   };
   
   if (localStorage.getItem("caro_dark") === "1") document.body.classList.add("dark-mode");
@@ -267,7 +264,6 @@ window.toggleDarkMode = function() {
     document.getElementById("dmText").innerHTML = isDark ? "☀️ Sáng" : "🌙 Tối";
 };
 
-
 window.openAdminLogin = async function() {
     const pass = prompt("Nhập mật khẩu quản trị:");
     if (!pass) return;
@@ -312,7 +308,6 @@ window.adminDeleteRoom = async function(roomId) {
         window.loadAdminRooms();
     }
 };
-
 
 /* =======================
    NHỊP TIM & THOÁT PHÒNG
@@ -377,7 +372,6 @@ window.addEventListener("beforeunload", (e) => {
 function emptyBoard() { return Array.from({ length: BOARD_SIZE }, () => Array(BOARD_SIZE).fill("")); }
 function inBounds(r, c) { return r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE; }
 function flattenBoard2D(b2) { return b2.flat(); }
-function unflattenTo2D(board1D) { const b = emptyBoard(); for (let i = 0; i < BOARD_SIZE * BOARD_SIZE; i++) b[Math.floor(i / BOARD_SIZE)][i % BOARD_SIZE] = board1D[i] || ""; return b; }
 function indexOfMove(r, c) { return r * BOARD_SIZE + c; }
 function rcFromIndex(idx) { return { r: Math.floor(idx / BOARD_SIZE), c: idx % BOARD_SIZE }; }
 function getCellElement(r, c) { return boardElement.querySelector(`[data-row="${r}"][data-col="${c}"]`); }
@@ -434,7 +428,7 @@ function buildBoardDOM() {
 }
 
 function resetLocalGame(keepOnline = false) {
-  State.board = emptyBoard(); State.moveHistory = []; State.currentPlayer = "X"; State.gameActive = true; State.lastMoveElement = null; State.isAiThinking = false; State.opponentRequestedRematch = false; State.swapRequested = false; State.processedWinner = false;
+  State.board = emptyBoard(); State.moveHistory = []; State.currentPlayer = "X"; State.gameActive = true; State.lastMoveElement = null; State.isAiThinking = false; State.opponentRequestedRematch = false; State.swapRequested = false;
   const rematchBtn = document.getElementById("btnInGameRematch"); if (rematchBtn) { rematchBtn.innerHTML = "🔄 Chơi Lại"; rematchBtn.classList.remove("pulse-btn"); }
   const swapBtn = document.getElementById("btnInGameSwap"); if (swapBtn) { swapBtn.innerHTML = "🎲 Đổi Bên"; swapBtn.classList.remove("pulse-btn"); }
   if (modalOverlay) modalOverlay.classList.remove("active"); document.querySelectorAll(".win-cell").forEach(e => e.classList.remove("win-cell"));
@@ -467,7 +461,9 @@ function applyMoveLocally(r, c, player, isOnlineSync = false) {
   State.board[r][c] = player; const cell = getCellElement(r, c);
   if (cell) { cell.textContent = player; cell.classList.add(player.toLowerCase()); if (State.lastMoveElement) State.lastMoveElement.classList.remove("last-move"); cell.classList.add("last-move"); State.lastMoveElement = cell; }
   State.moveHistory.push({ row: r, col: c, player, element: cell });
-  AudioSys.play('click'); 
+  
+  // Phát âm thanh khi MÌNH đánh (hoặc đánh máy)
+  if (!isOnlineSync || player === State.mySide) AudioSys.play('click'); 
 
   const winCells = checkWin(r, c, player);
   if (winCells) {
@@ -592,7 +588,6 @@ window.joinOrCreateRoom = async function () {
   try {
     const snap = await getDoc(roomRef);
     if (!snap.exists()) {
-      // Random phe lúc tạo phòng
       const hostSide = Math.random() < 0.5 ? "X" : "O";
       const payload = {
         board1D: Array(BOARD_SIZE * BOARD_SIZE).fill(""), turn: "X", lastMoveIndex: -1,
@@ -622,7 +617,6 @@ window.joinOrCreateRoom = async function () {
         else if (pX === "") { await updateDoc(roomRef, { playerX: myLocalUid, playerNameX: myName, lastActive: now }); State.mySide = "X"; State.isSpectator = false; }
         else if (pO === "") { await updateDoc(roomRef, { playerO: myLocalUid, playerNameO: myName, lastActive: now }); State.mySide = "O"; State.isSpectator = false; } 
         else {
-           // Phòng đầy -> Vào làm khán giả
            State.mySide = "Spectator"; State.isSpectator = true; State.myName = myName;
            window.sendChat(`👋 Khán giả <b>${myName}</b> vừa vào xem.`, true);
            window.showToast("Bạn đã vào phòng với tư cách Khán Giả!");
@@ -657,17 +651,14 @@ function listenToRoom(roomRef) {
     const sTextX = document.getElementById("scoreTextX");
     const sTextO = document.getElementById("scoreTextO");
     if(sTextX && sTextO) {
-        // Tên (Bạn) sẽ được gắn vào đúng màu quân để dễ phân biệt
         let labelX = data.playerNameX || 'Quân X';
         let labelO = data.playerNameO || 'Quân O';
         if (!State.isSpectator) {
             if (State.mySide === "X") labelX = `${labelX} (Bạn)`;
             if (State.mySide === "O") labelO = `${labelO} (Bạn)`;
         }
-        
         sTextX.textContent = `${labelX}: ${State.scoreX}`;
         sTextO.textContent = `${labelO}: ${State.scoreO}`;
-        
         sTextX.style.fontWeight = State.mySide === "X" ? "900" : "normal";
         sTextO.style.fontWeight = State.mySide === "O" ? "900" : "normal";
     }
@@ -682,7 +673,6 @@ function listenToRoom(roomRef) {
       if (!isOpponentHere && State.gameActive === false && State.currentRoomId && !State.isSpectator) window.showToast(`${State.oppName} đã rời phòng!`);
     }
 
-    // Xử lý Rematch Request
     const btnRematch = document.getElementById("btnInGameRematch");
     if (data.rematchRequest && !State.isSpectator) {
         if (data.rematchRequest !== State.mySide) {
@@ -694,7 +684,6 @@ function listenToRoom(roomRef) {
         if(btnRematch) { btnRematch.innerHTML = "🔄 Chơi Lại"; btnRematch.classList.remove("pulse-btn"); }
     }
 
-    // Xử lý Swap Request (Đổi bên)
     const btnSwap = document.getElementById("btnInGameSwap");
     if (data.swapRequest && !State.isSpectator && State.moveHistory.length === 0) {
         if (data.swapRequest !== State.mySide) {
@@ -706,26 +695,30 @@ function listenToRoom(roomRef) {
         if(btnSwap) { btnSwap.innerHTML = "🎲 Đổi Bên"; btnSwap.classList.remove("pulse-btn"); }
     }
 
-    // Bắt tín hiệu reset (ván mới) HOẶC đổi phe
     if (data.resetSignal && data.resetSignal !== State.currentResetSignal) {
       State.currentResetSignal = data.resetSignal; 
-      
       if(!State.isSpectator) {
           if(data.playerX === myLocalUid) State.mySide = "X";
           else if(data.playerO === myLocalUid) State.mySide = "O";
       }
-
       resetLocalGame(true); State.currentPlayer = data.turn || "X"; updateUIState(); 
       window.showToast("Bàn cờ đã được làm mới!"); return; 
     }
 
+    // TỐI ƯU QUÉT BÀN CỜ ĐỂ GIẢM LAG
     if (Array.isArray(data.board1D) && data.board1D.length === BOARD_SIZE * BOARD_SIZE) {
-      const serverBoard = unflattenTo2D(data.board1D);
-      for (let r = 0; r < BOARD_SIZE; r++) for (let c = 0; c < BOARD_SIZE; c++) {
-          const v = serverBoard[r][c];
+      for (let i = 0; i < BOARD_SIZE * BOARD_SIZE; i++) {
+          const r = Math.floor(i / BOARD_SIZE);
+          const c = i % BOARD_SIZE;
+          const v = data.board1D[i];
           if (State.board[r][c] !== v) {
-            State.board[r][c] = v; const cell = getCellElement(r, c);
-            if (cell) { cell.textContent = v; cell.className = "cell"; if (v === "X" || v === "O") cell.classList.add(v.toLowerCase()); }
+            State.board[r][c] = v; 
+            const cell = getCellElement(r, c);
+            if (cell) { 
+                cell.textContent = v; 
+                cell.className = "cell"; 
+                if (v) cell.classList.add(v.toLowerCase()); 
+            }
           }
       }
     }
@@ -735,11 +728,16 @@ function listenToRoom(roomRef) {
       if (cell) {
          if (State.lastMoveElement) State.lastMoveElement.classList.remove("last-move");
          cell.classList.add("last-move"); State.lastMoveElement = cell;
-         if (State.currentPlayer === State.mySide && data.turn === State.mySide) AudioSys.play('click');
+         
+         // Phát tiếng cạch nếu đối thủ đánh (kiểm tra turn được trả về đã chuyển sang mình chưa)
+         if (data.turn === State.mySide && !State.isSpectator) {
+             AudioSys.play('click');
+         } else if (State.isSpectator) {
+             AudioSys.play('click'); 
+         }
       }
     }
 
-    // XỬ LÝ KHI CÓ WINNER (Thắng cờ)
     if (data.winner && State.gameActive) {
        State.gameActive = false;
        if (data.winCells) highlightWinCells(data.winCells);
@@ -749,18 +747,6 @@ function listenToRoom(roomRef) {
        } else {
            if (data.winner === State.mySide) { showModal("🎉 Bạn đã chiến thắng!"); AudioSys.play('win'); }
            else { showModal(`🥲 ${State.oppName} đã chiến thắng!`); AudioSys.play('lose'); }
-       }
-       
-       // CỘNG ĐIỂM (Cơ chế an toàn: Chỉ người chơi X tự kiểm tra và cộng điểm cho đúng 1 lần)
-       // Không cho cả X và O cùng gửi lệnh cộng điểm để tránh bị +2 điểm 1 ván.
-       if (!State.processedWinner) {
-           State.processedWinner = true;
-           if (!State.isSpectator && State.mySide === "X") {
-               const updateData = {};
-               if (data.winner === "X") updateData.scoreX = State.scoreX + 1;
-               else updateData.scoreO = State.scoreO + 1;
-               updateDoc(roomRef, updateData).catch(()=>{});
-           }
        }
     }
 
@@ -778,7 +764,19 @@ function syncMoveToFirebase(row, col, playerJustMoved, winCellsData) {
   const turnNext = (playerJustMoved === "X") ? "O" : "X";
   
   let payload = { board1D: flattenBoard2D(State.board), turn: turnNext, lastMoveIndex, lastActive: Date.now(), swapRequest: null };
-  if (winCellsData) { payload.winner = playerJustMoved; payload.winCells = winCellsData; }
+  
+  // FIX TỈ SỐ: Gửi kèm điểm số ngay khi có kết quả thắng
+  if (winCellsData) { 
+      payload.winner = playerJustMoved; 
+      payload.winCells = winCellsData; 
+      
+      if (playerJustMoved === "X") {
+          payload.scoreX = State.scoreX + 1;
+      } else {
+          payload.scoreO = State.scoreO + 1;
+      }
+  }
+  
   updateDoc(roomRef, payload).catch(e => console.error(e));
 }
 
