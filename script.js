@@ -110,7 +110,7 @@ function injectDynamicUI() {
       .toast-msg.show { opacity: 1; top: 50px; }
 
       /* Tỉ số */
-      #scoreBoard { display: none; background: white; padding: 5px 15px; border-radius: 20px; margin-bottom: 10px; font-weight: bold; border: 2px solid #cbd5e1; color: #334155; box-shadow: 0 2px 4px rgba(0,0,0,0.05); align-items: center; gap: 10px; }
+      #scoreBoard { display: none; background: white; padding: 5px 15px; border-radius: 20px; margin-bottom: 10px; font-weight: bold; border: 2px solid #cbd5e1; color: #334155; box-shadow: 0 2px 4px rgba(0,0,0,0.05); align-items: center; gap: 10px; justify-content: center;}
       .score-badge { padding: 2px 8px; border-radius: 10px; color: white; font-size: 0.9rem; }
       .score-x { background-color: var(--x-color); }
       .score-o { background-color: var(--o-color); }
@@ -254,7 +254,6 @@ function updateUIState() {
       if (scoreBoard && !State.isSpectator) scoreBoard.style.display = "flex";
       else if(scoreBoard) scoreBoard.style.display = "none";
       
-      // Ẩn nút nếu là khán giả, hoặc Ẩn luôn nút Đổi bên nếu đã có quân cờ trên bàn
       document.querySelectorAll(".spectator-hide").forEach(el => {
           if (el.id === "btnInGameSwap") {
               el.style.display = (State.isSpectator || State.moveHistory.length > 0) ? "none" : "block";
@@ -272,7 +271,12 @@ function updateUIState() {
 
   if (mode === "online") {
     if (!State.currentRoomId) { turnIndicator.textContent = "Chưa vào phòng"; turnIndicator.style.color = "#94a3b8"; turnIndicator.style.borderColor = "#cbd5e1"; return; }
-    if (State.isSpectator) { turnIndicator.textContent = `👀 Khán giả | Lượt: ${State.currentPlayer}`; turnIndicator.style.color = "#64748b"; turnIndicator.style.borderColor = "#cbd5e1"; return; }
+    
+    if (State.isSpectator) {
+        turnIndicator.textContent = `👀 Khán giả | Lượt: ${State.currentPlayer}`;
+        turnIndicator.style.color = "#64748b"; turnIndicator.style.borderColor = "#cbd5e1";
+        return;
+    }
 
     if (State.currentPlayer === State.mySide) { turnIndicator.textContent = `Lượt đi: ${State.myName} (${State.currentPlayer})`; turnIndicator.style.color = State.currentPlayer === "X" ? "var(--x-color)" : "var(--o-color)"; } 
     else { turnIndicator.textContent = `Đợi ${State.oppName} (${State.currentPlayer})...`; turnIndicator.style.color = "#64748b"; }
@@ -449,12 +453,14 @@ window.joinOrCreateRoom = async function () {
   try {
     const snap = await getDoc(roomRef);
     if (!snap.exists()) {
+      // Random phe lúc tạo phòng
       const hostSide = Math.random() < 0.5 ? "X" : "O";
       const payload = {
         board1D: Array(BOARD_SIZE * BOARD_SIZE).fill(""), turn: "X", lastMoveIndex: -1,
         playerX: hostSide === "X" ? myLocalUid : "", playerO: hostSide === "O" ? myLocalUid : "",
         playerNameX: hostSide === "X" ? myName : "", playerNameO: hostSide === "O" ? myName : "",
-        resetSignal: now, lastActive: now, winner: null, winCells: null, rematchRequest: null, swapRequest: null, scoreX: 0, scoreO: 0
+        resetSignal: now, lastActive: now, winner: null, winCells: null, rematchRequest: null, swapRequest: null,
+        scoreX: 0, scoreO: 0
       };
       await setDoc(roomRef, payload);
       State.mySide = hostSide; State.currentRoomId = roomId; State.isSpectator = false;
@@ -466,7 +472,8 @@ window.joinOrCreateRoom = async function () {
             board1D: Array(BOARD_SIZE * BOARD_SIZE).fill(""), turn: "X", lastMoveIndex: -1,
             playerX: hostSide === "X" ? myLocalUid : "", playerO: hostSide === "O" ? myLocalUid : "", 
             playerNameX: hostSide === "X" ? myName : "", playerNameO: hostSide === "O" ? myName : "",
-            resetSignal: now, lastActive: now, winner: null, winCells: null, rematchRequest: null, swapRequest: null, scoreX: 0, scoreO: 0
+            resetSignal: now, lastActive: now, winner: null, winCells: null, rematchRequest: null, swapRequest: null,
+            scoreX: 0, scoreO: 0
          });
          State.mySide = hostSide; State.isSpectator = false;
       } else {
@@ -476,6 +483,7 @@ window.joinOrCreateRoom = async function () {
         else if (pX === "") { await updateDoc(roomRef, { playerX: myLocalUid, playerNameX: myName, lastActive: now }); State.mySide = "X"; State.isSpectator = false; }
         else if (pO === "") { await updateDoc(roomRef, { playerO: myLocalUid, playerNameO: myName, lastActive: now }); State.mySide = "O"; State.isSpectator = false; } 
         else {
+           // Phòng đầy -> Vào làm khán giả
            State.mySide = "Spectator"; State.isSpectator = true; State.myName = myName;
            window.sendChat(`👋 ${myName} vừa vào xem trận đấu.`, true);
            window.showToast("Bạn đã vào phòng với tư cách Khán Giả!");
@@ -501,14 +509,20 @@ function listenToRoom(roomRef) {
     State.uidX = data.playerX; State.uidO = data.playerO;
 
     if (!State.isSpectator) {
+        // Fix đồng bộ tên: luôn đọc từ Firebase
         State.myName = State.mySide === "X" ? (data.playerNameX || "Bạn") : (data.playerNameO || "Bạn");
         State.oppName = State.mySide === "X" ? (data.playerNameO || "Đối thủ") : (data.playerNameX || "Đối thủ");
-    } else { State.oppName = "Hai người chơi"; }
+    } else {
+        State.oppName = "Hai người chơi"; // Khán giả
+    }
 
-    const sTextX = document.getElementById("scoreTextX"); const sTextO = document.getElementById("scoreTextO");
+    // Cập nhật bảng tỉ số
+    const sTextX = document.getElementById("scoreTextX");
+    const sTextO = document.getElementById("scoreTextO");
     if(sTextX && sTextO) {
         sTextX.textContent = `${data.playerNameX || 'Quân X'}: ${State.scoreX}`;
         sTextO.textContent = `${data.playerNameO || 'Quân O'}: ${State.scoreO}`;
+        // Bôi đậm tên mình
         sTextX.style.fontWeight = State.mySide === "X" ? "900" : "normal";
         sTextO.style.fontWeight = State.mySide === "O" ? "900" : "normal";
     }
@@ -523,6 +537,7 @@ function listenToRoom(roomRef) {
       if (!isOpponentHere && State.gameActive === false && State.currentRoomId && !State.isSpectator) window.showToast(`${State.oppName} đã rời phòng!`);
     }
 
+    // Xử lý Rematch Request
     const btnRematch = document.getElementById("btnInGameRematch");
     if (data.rematchRequest && !State.isSpectator) {
         if (data.rematchRequest !== State.mySide) {
@@ -534,8 +549,8 @@ function listenToRoom(roomRef) {
         if(btnRematch) { btnRematch.innerHTML = "🔄 Chơi Lại"; btnRematch.classList.remove("pulse-btn"); }
     }
 
+    // Xử lý Swap Request (Đổi bên)
     const btnSwap = document.getElementById("btnInGameSwap");
-    // Chỉ hiện yêu cầu đổi bên nếu chưa có quân cờ nào trên bàn
     if (data.swapRequest && !State.isSpectator && State.moveHistory.length === 0) {
         if (data.swapRequest !== State.mySide) {
             State.swapRequested = true;
@@ -546,12 +561,17 @@ function listenToRoom(roomRef) {
         if(btnSwap) { btnSwap.innerHTML = "🎲 Đổi Bên"; btnSwap.classList.remove("pulse-btn"); }
     }
 
+    // Bắt tín hiệu reset (ván mới) HOẶC đổi phe
     if (data.resetSignal && data.resetSignal !== State.currentResetSignal) {
       State.currentResetSignal = data.resetSignal; 
+      
+      // Đọc lại phe từ database (trường hợp bị tráo đổi)
       if(!State.isSpectator) {
           if(data.playerX === myLocalUid) State.mySide = "X";
           else if(data.playerO === myLocalUid) State.mySide = "O";
+          State.myName = State.mySide === "X" ? (data.playerNameX || "Bạn") : (data.playerNameO || "Bạn");
       }
+
       resetLocalGame(true); State.currentPlayer = data.turn || "X"; updateUIState(); 
       window.showToast("Bàn cờ đã được làm mới!"); return; 
     }
@@ -579,8 +599,10 @@ function listenToRoom(roomRef) {
     if (data.winner && State.gameActive) {
        State.gameActive = false;
        if (data.winCells) highlightWinCells(data.winCells);
-       if (State.isSpectator) { showModal(`🎉 ${data.winner === "X" ? data.playerNameX : data.playerNameO} (${data.winner}) đã chiến thắng!`); } 
-       else {
+       
+       if (State.isSpectator) {
+           showModal(`🎉 ${data.winner === "X" ? data.playerNameX : data.playerNameO} (${data.winner}) đã chiến thắng!`);
+       } else {
            if (data.winner === State.mySide) { showModal("🎉 Bạn đã chiến thắng!"); AudioSys.play('win'); }
            else { showModal(`🥲 ${State.oppName} đã chiến thắng!`); AudioSys.play('lose'); }
        }
@@ -609,7 +631,6 @@ function syncMoveToFirebase(row, col, playerJustMoved, winCellsData) {
   const lastMoveIndex = indexOfMove(row, col);
   const turnNext = (playerJustMoved === "X") ? "O" : "X";
   
-  // Hủy yêu cầu đổi phe nếu có người đi nước cờ mới
   let payload = { board1D: flattenBoard2D(State.board), turn: turnNext, lastMoveIndex, lastActive: Date.now(), swapRequest: null };
   if (winCellsData) { payload.winner = playerJustMoved; payload.winCells = winCellsData; }
   updateDoc(roomRef, payload).catch(e => console.error(e));
@@ -626,6 +647,7 @@ window.requestRematch = async function () {
     
     if (State.opponentRequestedRematch) {
        if (modalOverlay) modalOverlay.classList.remove("active");
+       
        const snap = await getDoc(roomRef);
        if (snap.exists()) {
            const d = snap.data();
