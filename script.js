@@ -165,7 +165,7 @@ function injectDynamicUI() {
   const dmIcon = localStorage.getItem("caro_dark") === "1" ? "☀️ Sáng" : "🌙 Tối";
   
   // Dùng link download raw của github để file tự tải xuống.
-  const iosConfigURL = "https://raw.githubusercontent.com/Hyakjbw/minigame/main/co_caro.mobileconfig";
+  const iosConfigURL = "https://hyakjbw.github.io/minigame/co_caro.mobileconfig";
   
   sideMenu.innerHTML = `
       <div class="menu-item" onclick="window.toggleDarkMode()">
