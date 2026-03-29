@@ -164,9 +164,15 @@ function injectDynamicUI() {
   // Nút Dark Mode tích hợp vào Menu
   const dmIcon = localStorage.getItem("caro_dark") === "1" ? "☀️ Sáng" : "🌙 Tối";
   
+  // Dùng link download raw của github để file tự tải xuống.
+  const iosConfigURL = "https://raw.githubusercontent.com/Hyakjbw/minigame/main/co_caro.mobileconfig";
+  
   sideMenu.innerHTML = `
       <div class="menu-item" onclick="window.toggleDarkMode()">
           <span>Giao diện</span> <span id="dmText">${dmIcon}</span>
+      </div>
+      <div class="menu-item" onclick="window.downloadIOSConfig()">
+          ⬇️ Cài đặt Ứng dụng (iOS)
       </div>
       <div class="menu-item" onclick="window.openAdminLogin()">🛡️ Quản trị Admin</div>
       
@@ -177,6 +183,18 @@ function injectDynamicUI() {
       </div>
   `;
   document.body.appendChild(sideMenu);
+  
+  window.downloadIOSConfig = function() {
+      // Hàm ẩn tạo link ảo, bắt trình duyệt tự động tải xuống.
+      window.showToast("Đang tải cấu hình. Bạn nhớ cấp quyền cài đặt nhé!");
+      const a = document.createElement("a");
+      a.href = iosConfigURL;
+      a.download = "co_caro.mobileconfig"; 
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+  };
+  
   if (localStorage.getItem("caro_dark") === "1") document.body.classList.add("dark-mode");
 
   const oPanel = document.getElementById("onlinePanel");
@@ -248,6 +266,7 @@ window.toggleDarkMode = function() {
     localStorage.setItem("caro_dark", isDark ? "1" : "0");
     document.getElementById("dmText").innerHTML = isDark ? "☀️ Sáng" : "🌙 Tối";
 };
+
 
 window.openAdminLogin = async function() {
     const pass = prompt("Nhập mật khẩu quản trị:");
