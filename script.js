@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import {
   getFirestore, doc, setDoc, getDoc, updateDoc,
-  onSnapshot, collection, query, where, deleteDoc
+  onSnapshot, collection, query, where, deleteDoc, getDocs
 } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
 /* =======================
@@ -71,6 +71,16 @@ const State = {
 };
 
 /* =======================
+   BẢO MẬT ADMIN (MÃ HÓA)
+======================= */
+const ADMIN_PASS_HASH = "415f18ee12d87c15a4fe4d652f6ba1c32692962fd9a9662fcf1fd1387f3af409"; 
+
+async function hashPassword(str) {
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/* =======================
    TẠO GIAO DIỆN TỰ ĐỘNG BẰNG JS
 ======================= */
 function injectDynamicUI() {
@@ -91,9 +101,23 @@ function injectDynamicUI() {
       body.dark-mode .emote-row { background: #0f172a; }
       body.dark-mode .modal-content { background: #1e293b; color: #f8fafc; }
       body.dark-mode .modal-title { color: #f8fafc; }
-      #darkModeBtn { position: fixed; top: 15px; left: 15px; background: white; border: 2px solid #cbd5e1; border-radius: 50%; width: 45px; height: 45px; font-size: 1.5rem; cursor: pointer; z-index: 1000; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition:0.3s; display:flex; justify-content:center; align-items:center; }
-      body.dark-mode #darkModeBtn { background: #334155; border-color: #475569; }
+      
+      /* Menu trượt bên trái */
+      #menuToggleBtn { position: fixed; top: 15px; left: 15px; background: white; border: 2px solid #cbd5e1; border-radius: 8px; padding: 8px 12px; font-size: 1.2rem; cursor: pointer; z-index: 1001; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition:0.3s; color: #334155; font-weight:bold; }
+      body.dark-mode #menuToggleBtn { background: #334155; border-color: #475569; color:white; }
+      
+      #sideMenu { position: fixed; top: 0; left: -300px; width: 280px; height: 100vh; background: white; z-index: 1002; transition: 0.3s; box-shadow: 2px 0 15px rgba(0,0,0,0.2); display:flex; flex-direction:column; padding-top: 60px; }
+      body.dark-mode #sideMenu { background: #1e293b; color:white; border-right: 1px solid #334155; }
+      #sideMenu.open { left: 0; }
+      .menu-item { padding: 15px 20px; font-size: 1.1rem; border-bottom: 1px solid #e2e8f0; cursor: pointer; font-weight: 600; display:flex; align-items:center; justify-content:space-between; }
+      .menu-item:hover { background: #f8fafc; }
+      body.dark-mode .menu-item { border-bottom-color: #334155; }
+      body.dark-mode .menu-item:hover { background: #334155; }
+      #menuOverlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index: 1000; display:none; }
 
+      #darkModeToggle { display:flex; align-items:center; justify-content:space-between; width:100%; }
+
+      /* In Game UI */
       #inGameUI { display: none; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: 15px; width: 100%; transition: 0.3s; }
       .chat-panel { display: none; position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%); width: 340px; background: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); z-index: 1000; flex-direction: column; overflow: hidden; border: 1px solid #cbd5e1; }
       .chat-messages { height: 220px; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; background: #f8fafc; scroll-behavior: smooth; }
@@ -111,19 +135,49 @@ function injectDynamicUI() {
 
       /* Tỉ số */
       #scoreBoard { display: none; background: white; padding: 5px 15px; border-radius: 20px; margin-bottom: 10px; font-weight: bold; border: 2px solid #cbd5e1; color: #334155; box-shadow: 0 2px 4px rgba(0,0,0,0.05); align-items: center; gap: 10px; justify-content: center;}
-      .score-badge { padding: 2px 8px; border-radius: 10px; color: white; font-size: 0.9rem; }
+      .score-badge { padding: 4px 10px; border-radius: 12px; color: white; font-size: 0.9rem; }
       .score-x { background-color: var(--x-color); }
       .score-o { background-color: var(--o-color); }
+      
+      /* Admin Panel */
+      #adminPanel { display:none; flex-direction:column; padding: 15px; background: #fef2f2; border: 2px dashed #ef4444; border-radius: 8px; margin: 15px; }
+      body.dark-mode #adminPanel { background: #450a0a; border-color: #991b1b; }
+      .admin-room-item { background:white; border: 1px solid #fca5a5; padding: 8px; margin-bottom: 5px; border-radius: 6px; display:flex; justify-content:space-between; align-items:center; font-size:0.9rem; }
+      body.dark-mode .admin-room-item { background: #1e293b; border-color: #7f1d1d; }
   `;
   document.head.appendChild(style);
 
-  const darkModeBtn = document.createElement("button"); darkModeBtn.id = "darkModeBtn";
-  darkModeBtn.innerHTML = localStorage.getItem("caro_dark") === "1" ? "☀️" : "🌙";
-  darkModeBtn.onclick = () => {
-      AudioSys.play('click'); const isDark = document.body.classList.toggle("dark-mode");
-      localStorage.setItem("caro_dark", isDark ? "1" : "0"); darkModeBtn.innerHTML = isDark ? "☀️" : "🌙";
-  };
-  document.body.appendChild(darkModeBtn);
+  // Menu Toggle Button
+  const menuToggleBtn = document.createElement("button");
+  menuToggleBtn.id = "menuToggleBtn"; menuToggleBtn.innerHTML = "☰";
+  menuToggleBtn.onclick = window.toggleSideMenu;
+  document.body.appendChild(menuToggleBtn);
+
+  // Overlay Menu
+  const menuOverlay = document.createElement("div"); menuOverlay.id = "menuOverlay";
+  menuOverlay.onclick = window.toggleSideMenu;
+  document.body.appendChild(menuOverlay);
+
+  // Side Menu Container
+  const sideMenu = document.createElement("div"); sideMenu.id = "sideMenu";
+  
+  // Nút Dark Mode tích hợp vào Menu
+  const dmIcon = localStorage.getItem("caro_dark") === "1" ? "☀️ Sáng" : "🌙 Tối";
+  
+  sideMenu.innerHTML = `
+      <div class="menu-item" onclick="window.toggleDarkMode()">
+          <span>Giao diện</span> <span id="dmText">${dmIcon}</span>
+      </div>
+      <div class="menu-item" onclick="window.showRules()">📜 Luật chơi Caro</div>
+      <div class="menu-item" onclick="window.openAdminLogin()">🛡️ Quản trị Admin</div>
+      
+      <div id="adminPanel">
+          <div style="font-weight:bold; color:#ef4444; margin-bottom:10px; text-align:center;">--- KHU VỰC QUẢN TRỊ ---</div>
+          <button class="btn-action" style="background:#3b82f6; color:white; border:none; margin-bottom:10px;" onclick="window.loadAdminRooms()">🔄 Quét Phòng Mạng</button>
+          <div id="adminRoomList" style="max-height: 300px; overflow-y:auto; font-size:0.85rem;"></div>
+      </div>
+  `;
+  document.body.appendChild(sideMenu);
   if (localStorage.getItem("caro_dark") === "1") document.body.classList.add("dark-mode");
 
   const oPanel = document.getElementById("onlinePanel");
@@ -138,7 +192,7 @@ function injectDynamicUI() {
 
   const scoreBoard = document.createElement("div");
   scoreBoard.id = "scoreBoard";
-  scoreBoard.innerHTML = `🏆 Tỉ số: <span id="scoreTextX" class="score-badge score-x">Bạn (X): 0</span> - <span id="scoreTextO" class="score-badge score-o">Đối thủ (O): 0</span>`;
+  scoreBoard.innerHTML = `🏆 Tỉ số: <span id="scoreTextX" class="score-badge score-x">0</span> - <span id="scoreTextO" class="score-badge score-o">0</span>`;
   const statusBar = document.querySelector(".status-bar");
   if(statusBar) statusBar.insertBefore(scoreBoard, turnIndicator);
 
@@ -174,6 +228,83 @@ window.showToast = function(msg) {
   toast.textContent = msg; toast.classList.add("show");
   setTimeout(() => toast.classList.remove("show"), 3500);
 }
+
+/* =======================
+   XỬ LÝ MENU & BẢO MẬT ADMIN
+======================= */
+window.toggleSideMenu = function() {
+    AudioSys.play('click');
+    const menu = document.getElementById("sideMenu");
+    const overlay = document.getElementById("menuOverlay");
+    if(menu.classList.contains("open")) {
+        menu.classList.remove("open"); overlay.style.display = "none";
+    } else {
+        menu.classList.add("open"); overlay.style.display = "block";
+    }
+};
+
+window.toggleDarkMode = function() {
+    AudioSys.play('click');
+    const isDark = document.body.classList.toggle("dark-mode");
+    localStorage.setItem("caro_dark", isDark ? "1" : "0");
+    document.getElementById("dmText").innerHTML = isDark ? "☀️ Sáng" : "🌙 Tối";
+};
+
+window.showRules = function() {
+    window.toggleSideMenu();
+    let rules = `<b>📜 LUẬT CHƠI CỜ CARO:</b><br><br>
+    - Hai bên luân phiên đặt quân X và O.<br>
+    - Bên nào tạo được 1 đường <b>5 quân liên tiếp</b> (Ngang, Dọc, Chéo) sẽ thắng.<br>
+    - Bị chặn 2 đầu (VD: OXXXXXO) thì <b>không được tính là thắng</b>.<br>
+    - Đổi phe, gạ chơi lại chỉ áp dụng khi bàn cờ trống hoặc ván đấu đã kết thúc.`;
+    showModal(rules);
+};
+
+window.openAdminLogin = async function() {
+    const pass = prompt("Nhập mật khẩu quản trị:");
+    if (!pass) return;
+    const hash = await hashPassword(pass);
+    if (hash === ADMIN_PASS_HASH) {
+        document.getElementById("adminPanel").style.display = "flex";
+        window.showToast("🔓 Đã mở khóa Admin!");
+        window.loadAdminRooms();
+    } else {
+        window.showToast("❌ Sai mật khẩu!");
+    }
+};
+
+window.loadAdminRooms = async function() {
+    if (!db) return window.showToast("Lỗi mạng!");
+    const listEl = document.getElementById("adminRoomList");
+    listEl.innerHTML = "<i>Đang quét phòng...</i>";
+    
+    try {
+        const qSnap = await getDocs(collection(db, "rooms"));
+        if (qSnap.empty) { listEl.innerHTML = "Không có phòng nào."; return; }
+        
+        let html = "";
+        qSnap.forEach(docSnap => {
+            const d = docSnap.data();
+            const rName = docSnap.id.replace("room_", "");
+            const pCount = (d.playerX ? 1 : 0) + (d.playerO ? 1 : 0);
+            html += `<div class="admin-room-item">
+                        <span><b>${rName}</b> (${pCount}/2)</span>
+                        <button style="background:#ef4444; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;" onclick="window.adminDeleteRoom('${docSnap.id}')">Xóa</button>
+                     </div>`;
+        });
+        listEl.innerHTML = html;
+    } catch(e) { listEl.innerHTML = "Lỗi quét dữ liệu."; }
+};
+
+window.adminDeleteRoom = async function(roomId) {
+    if(!confirm("Chắc chắn muốn xóa phòng này?")) return;
+    if(db) {
+        await deleteDoc(doc(db, "rooms", roomId));
+        window.showToast("Đã xóa phòng " + roomId);
+        window.loadAdminRooms();
+    }
+};
+
 
 /* =======================
    NHỊP TIM & THOÁT PHÒNG
@@ -251,8 +382,7 @@ function updateUIState() {
 
   if (mode === "online" && State.currentRoomId) {
       if (inGameUI) inGameUI.style.display = "flex";
-      if (scoreBoard && !State.isSpectator) scoreBoard.style.display = "flex";
-      else if(scoreBoard) scoreBoard.style.display = "none";
+      if (scoreBoard) scoreBoard.style.display = "flex"; // Khán giả vẫn thấy tỉ số
       
       document.querySelectorAll(".spectator-hide").forEach(el => {
           if (el.id === "btnInGameSwap") {
@@ -485,7 +615,7 @@ window.joinOrCreateRoom = async function () {
         else {
            // Phòng đầy -> Vào làm khán giả
            State.mySide = "Spectator"; State.isSpectator = true; State.myName = myName;
-           window.sendChat(`👋 ${myName} vừa vào xem trận đấu.`, true);
+           window.sendChat(`👋 Khán giả <b>${myName}</b> vừa vào xem.`, true);
            window.showToast("Bạn đã vào phòng với tư cách Khán Giả!");
         }
       }
@@ -505,24 +635,30 @@ function listenToRoom(roomRef) {
     }
     const data = snap.data();
 
+    // ĐỌC VÀ CẬP NHẬT TỈ SỐ HIỂN THỊ
     State.scoreX = data.scoreX || 0; State.scoreO = data.scoreO || 0;
-    State.uidX = data.playerX; State.uidO = data.playerO;
 
     if (!State.isSpectator) {
-        // Fix đồng bộ tên: luôn đọc từ Firebase
         State.myName = State.mySide === "X" ? (data.playerNameX || "Bạn") : (data.playerNameO || "Bạn");
         State.oppName = State.mySide === "X" ? (data.playerNameO || "Đối thủ") : (data.playerNameX || "Đối thủ");
     } else {
-        State.oppName = "Hai người chơi"; // Khán giả
+        State.oppName = "Hai người chơi"; 
     }
 
-    // Cập nhật bảng tỉ số
     const sTextX = document.getElementById("scoreTextX");
     const sTextO = document.getElementById("scoreTextO");
     if(sTextX && sTextO) {
-        sTextX.textContent = `${data.playerNameX || 'Quân X'}: ${State.scoreX}`;
-        sTextO.textContent = `${data.playerNameO || 'Quân O'}: ${State.scoreO}`;
-        // Bôi đậm tên mình
+        // Tên (Bạn) sẽ được gắn vào đúng màu quân để dễ phân biệt
+        let labelX = data.playerNameX || 'Quân X';
+        let labelO = data.playerNameO || 'Quân O';
+        if (!State.isSpectator) {
+            if (State.mySide === "X") labelX = `${labelX} (Bạn)`;
+            if (State.mySide === "O") labelO = `${labelO} (Bạn)`;
+        }
+        
+        sTextX.textContent = `${labelX}: ${State.scoreX}`;
+        sTextO.textContent = `${labelO}: ${State.scoreO}`;
+        
         sTextX.style.fontWeight = State.mySide === "X" ? "900" : "normal";
         sTextO.style.fontWeight = State.mySide === "O" ? "900" : "normal";
     }
@@ -565,11 +701,9 @@ function listenToRoom(roomRef) {
     if (data.resetSignal && data.resetSignal !== State.currentResetSignal) {
       State.currentResetSignal = data.resetSignal; 
       
-      // Đọc lại phe từ database (trường hợp bị tráo đổi)
       if(!State.isSpectator) {
           if(data.playerX === myLocalUid) State.mySide = "X";
           else if(data.playerO === myLocalUid) State.mySide = "O";
-          State.myName = State.mySide === "X" ? (data.playerNameX || "Bạn") : (data.playerNameO || "Bạn");
       }
 
       resetLocalGame(true); State.currentPlayer = data.turn || "X"; updateUIState(); 
@@ -596,6 +730,7 @@ function listenToRoom(roomRef) {
       }
     }
 
+    // XỬ LÝ KHI CÓ WINNER (Thắng cờ)
     if (data.winner && State.gameActive) {
        State.gameActive = false;
        if (data.winCells) highlightWinCells(data.winCells);
@@ -607,11 +742,13 @@ function listenToRoom(roomRef) {
            else { showModal(`🥲 ${State.oppName} đã chiến thắng!`); AudioSys.play('lose'); }
        }
        
+       // CỘNG ĐIỂM (Cơ chế an toàn: Chỉ người chơi X tự kiểm tra và cộng điểm cho đúng 1 lần)
+       // Không cho cả X và O cùng gửi lệnh cộng điểm để tránh bị +2 điểm 1 ván.
        if (!State.processedWinner) {
            State.processedWinner = true;
-           if (!State.isSpectator && data.winner === State.mySide) {
+           if (!State.isSpectator && State.mySide === "X") {
                const updateData = {};
-               if (State.mySide === "X") updateData.scoreX = State.scoreX + 1;
+               if (data.winner === "X") updateData.scoreX = State.scoreX + 1;
                else updateData.scoreO = State.scoreO + 1;
                updateDoc(roomRef, updateData).catch(()=>{});
            }
@@ -727,7 +864,7 @@ window.toggleChat = function() {
 window.sendChat = function(text, isSystemMsg = false) {
     AudioSys.play('click');
     if (!State.currentRoomId || !db) return;
-    let sName = State.isSpectator ? `👁️ Khán giả (${State.myName})` : State.myName;
+    let sName = State.isSpectator ? `👁️ (${State.myName})` : State.myName;
     if (isSystemMsg) sName = "Hệ thống";
     
     updateDoc(doc(db, "rooms", State.currentRoomId), { chatMessage: { text: text, sender: State.mySide, sName: sName, sys: isSystemMsg, id: Date.now() }, lastActive: Date.now() }).catch(e => console.log(e));
@@ -795,7 +932,7 @@ window.undoMove = function () {
 let cheatClicks = 0; let cheatTimeout = null;
 window.handleFooterClick = function () {
   clearTimeout(cheatTimeout); cheatClicks++; const cheatBtn = document.getElementById("cheatBtn");
-  if (cheatClicks >= 3) { if (cheatBtn) cheatBtn.style.display = "block"; cheatClicks = 0; return; }
+  if (cheatClicks >= 4) { if (cheatBtn) cheatBtn.style.display = "block"; cheatClicks = 0; return; }
   cheatTimeout = setTimeout(() => { if (cheatClicks === 2) { if (cheatBtn) cheatBtn.style.display = "none"; } cheatClicks = 0; }, 500); 
 };
 window.handleCheatClick = window.handleFooterClick;
